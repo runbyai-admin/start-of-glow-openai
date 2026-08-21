@@ -1,109 +1,111 @@
 import Phaser from "phaser";
 
-/**
- * Every texture in this repo is generated at runtime.
- * The spec forbids downloaded sprite packs, so shapes are drawn with the
- * canvas API into Phaser textures at boot.
- */
-
-function makeCanvasTexture(
-  scene: Phaser.Scene,
-  key: string,
-  width: number,
-  height: number,
-  draw: (ctx: CanvasRenderingContext2D) => void,
-): void {
+function canvasTexture(scene: Phaser.Scene, key: string, width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): void {
   if (scene.textures.exists(key)) return;
   const texture = scene.textures.createCanvas(key, width, height);
-  if (!texture) throw new Error(`could not create canvas texture "${key}"`);
-  const ctx = texture.getContext();
-  draw(ctx);
+  if (!texture) throw new Error(`could not create texture ${key}`);
+  draw(texture.getContext());
   texture.refresh();
 }
 
-/** Soft radial glow - the light-being itself, and its motes. */
-export function makeGlowTexture(
-  scene: Phaser.Scene,
-  key: string,
-  radius: number,
-  core: string,
-  edge: string,
-): void {
-  const size = radius * 2;
-  makeCanvasTexture(scene, key, size, size, (ctx) => {
+export function makeGlowTexture(scene: Phaser.Scene, key: string, radius: number, core: string, middle: string): void {
+  canvasTexture(scene, key, radius * 2, radius * 2, (ctx) => {
     const gradient = ctx.createRadialGradient(radius, radius, 0, radius, radius, radius);
     gradient.addColorStop(0, core);
-    gradient.addColorStop(0.35, edge);
+    gradient.addColorStop(0.16, core);
+    gradient.addColorStop(0.42, middle);
     gradient.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, radius * 2, radius * 2);
+  });
+}
+
+function makeShadow(scene: Phaser.Scene): void {
+  canvasTexture(scene, "shadow", 96, 96, (ctx) => {
+    const gradient = ctx.createRadialGradient(48, 48, 2, 48, 48, 47);
+    gradient.addColorStop(0, "rgba(2,3,12,1)");
+    gradient.addColorStop(0.58, "rgba(7,5,20,0.95)");
+    gradient.addColorStop(1, "rgba(55,20,80,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 96, 96);
+    ctx.strokeStyle = "rgba(155,90,190,0.7)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(radius, radius, radius, 0, Math.PI * 2);
+    ctx.moveTo(23, 50);
+    ctx.quadraticCurveTo(48, 18, 73, 50);
+    ctx.quadraticCurveTo(48, 78, 23, 50);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(235,165,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(42, 46, 2.5, 0, Math.PI * 2);
+    ctx.arc(55, 46, 2.5, 0, Math.PI * 2);
     ctx.fill();
   });
 }
 
-/**
- * A tree silhouette: a tapering trunk with a few branches. Drawn white so the
- * Light2D pipeline can tint and light it; the scene applies the dark tint.
- */
-export function makeTreeTexture(
-  scene: Phaser.Scene,
-  key: string,
-  width: number,
-  height: number,
-  seed: number,
-): void {
-  makeCanvasTexture(scene, key, width, height, (ctx) => {
-    const rng = new Phaser.Math.RandomDataGenerator([String(seed)]);
-    ctx.fillStyle = "#ffffff";
+function makeGate(scene: Phaser.Scene): void {
+  canvasTexture(scene, "gate", 150, 180, (ctx) => {
     ctx.strokeStyle = "#ffffff";
-    ctx.lineCap = "round";
-
-    const baseX = width / 2;
+    ctx.lineWidth = 9;
     ctx.beginPath();
-    ctx.moveTo(baseX - width * 0.16, height);
-    ctx.quadraticCurveTo(baseX - width * 0.06, height * 0.4, baseX - width * 0.04, 0);
-    ctx.lineTo(baseX + width * 0.04, 0);
-    ctx.quadraticCurveTo(baseX + width * 0.06, height * 0.4, baseX + width * 0.16, height);
-    ctx.closePath();
-    ctx.fill();
-
-    const branches = rng.between(3, 5);
-    for (let i = 0; i < branches; i += 1) {
-      const y = height * (0.15 + 0.6 * (i / branches));
-      const dir = i % 2 === 0 ? -1 : 1;
-      const len = width * rng.realInRange(0.25, 0.45);
-      ctx.lineWidth = Math.max(2, width * 0.05 * (1 - i / branches));
+    ctx.arc(75, 94, 54, Math.PI, 0);
+    ctx.lineTo(129, 164);
+    ctx.moveTo(21, 164);
+    ctx.lineTo(21, 94);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i += 1) {
       ctx.beginPath();
-      ctx.moveTo(baseX, y);
-      ctx.quadraticCurveTo(baseX + dir * len * 0.6, y - len * 0.25, baseX + dir * len, y - len * 0.7);
+      ctx.arc(75, 94, 32 + i * 7, Math.PI * 1.12, Math.PI * 1.88);
       ctx.stroke();
     }
   });
 }
 
-/** A lumpy ground ridge, used as the foreground silhouette band. */
-export function makeGroundTexture(
-  scene: Phaser.Scene,
-  key: string,
-  width: number,
-  height: number,
-  seed: number,
-): void {
-  makeCanvasTexture(scene, key, width, height, (ctx) => {
-    const rng = new Phaser.Math.RandomDataGenerator([String(seed)]);
+function makeRock(scene: Phaser.Scene): void {
+  canvasTexture(scene, "rock", 170, 120, (ctx) => {
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.moveTo(0, height);
-    ctx.lineTo(0, height * 0.6);
-    const steps = 12;
-    for (let i = 1; i <= steps; i += 1) {
-      const x = (width / steps) * i;
-      const y = height * rng.realInRange(0.35, 0.75);
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(width, height);
+    ctx.moveTo(12, 109);
+    ctx.quadraticCurveTo(24, 46, 67, 27);
+    ctx.quadraticCurveTo(119, 4, 158, 108);
     ctx.closePath();
     ctx.fill();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(71, 60, 12, 0, Math.PI * 2);
+    ctx.fill();
   });
+}
+
+function makeTree(scene: Phaser.Scene): void {
+  canvasTexture(scene, "tree", 220, 620, (ctx) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(75, 620);
+    ctx.quadraticCurveTo(100, 310, 102, 0);
+    ctx.lineTo(118, 0);
+    ctx.quadraticCurveTo(122, 310, 154, 620);
+    ctx.fill();
+    ctx.lineWidth = 15;
+    for (const [y, direction] of [[105, -1], [190, 1], [285, -1], [385, 1]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(111, y);
+      ctx.quadraticCurveTo(111 + direction * 60, y - 25, 111 + direction * 94, y - 92);
+      ctx.stroke();
+    }
+  });
+}
+
+export function makeGameTextures(scene: Phaser.Scene): void {
+  makeGlowTexture(scene, "wisp", 72, "rgba(255,255,255,1)", "rgba(135,225,255,0.5)");
+  makeGlowTexture(scene, "seed", 32, "rgba(255,255,235,1)", "rgba(255,205,100,0.52)");
+  makeGlowTexture(scene, "spark", 18, "rgba(255,255,255,0.95)", "rgba(135,220,255,0.34)");
+  makeGlowTexture(scene, "halo", 95, "rgba(255,255,255,0.2)", "rgba(160,210,255,0.13)");
+  makeShadow(scene);
+  makeGate(scene);
+  makeRock(scene);
+  makeTree(scene);
 }

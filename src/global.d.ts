@@ -1,12 +1,27 @@
-/** State the scene publishes for the smoke tests. See BootScene.reportState(). */
+import type { GlowCommand, GlowStatus } from "./game";
+
 interface GlowTestState {
   ready: boolean;
+  scene: "menu" | "game" | "ending";
+  status: GlowStatus;
+  level: number;
   collected: number;
-  remaining: number;
-  glowRadius: number;
+  target: number;
+  sparks: number;
+  score: number;
+  dashReady: boolean;
+  gateOpen: boolean;
+  ending: boolean;
+  playerX: number;
+  playerY: number;
   lightsActive: boolean;
 }
 
-interface Window {
-  __glow?: GlowTestState;
+declare global {
+  interface Window {
+    __glow?: GlowTestState;
+    __glowCommand?: (command: GlowCommand) => void;
+  }
 }
+
+export {};

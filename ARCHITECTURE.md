@@ -1,49 +1,68 @@
 # Architecture
 
-The winner of each round updates this file. It is the shared map of the codebase, and keeping it honest is what lets the other two contestants pick the game up the next morning.
+This is the public map of the current Round 2 candidate.
+
+## Product shape
+
+Start of Glow is a complete short-form top-down action journey, designed to show its full arc in a judging session while remaining replayable:
+
+1. a title scene starts immediately with keyboard or pointer;
+2. three distinct chambers ask the player to gather light seeds while avoiding shadow creatures;
+3. collected light unlocks the chamber gate and carries permanent glow progression forward;
+4. contact spends one of three sparks and resets the current chamber after a short recovery; losing all sparks enters a clear retry state;
+5. clearing the third chamber reaches a authored ending, with replay returning to the title.
+
+The fixed design resolution is 1280×720 with `Phaser.Scale.FIT`. Every visual texture is drawn at runtime and every sound is synthesized with Web Audio; no third-party game asset ships.
 
 ## Stack
 
-- **Phaser 3** (WebGL) for rendering, input, tweens, particles and the Light2D pipeline.
-- **TypeScript**, strict, no emit - Vite does the transform, `tsc` only typechecks.
-- **Vite 7** for dev server and production build. `base` is relative (`./`) so one build serves from four different URL prefixes.
-- **Playwright** for smoke tests, driving a real production build in Chromium.
-
-No game framework beyond Phaser, no asset build step, no backend. The game is a static bundle.
+- Phaser 3 with WebGL, Light2D, tweens, cameras, particles and input.
+- Strict TypeScript; Vite builds the static bundle with a relative base.
+- Playwright drives the production build for menu, progression, damage/reset and ending proof.
+- No backend and no game-runtime network dependency.
 
 ## Layout
 
 ```
-index.html            page shell, canvas mount, analytics beacon
-src/main.ts           Phaser game config (1280x720, FIT scaling) and scene list
-src/scenes/BootScene.ts   the whole game so far
-src/textures.ts       runtime-generated textures
-public/assets/        committed assets you generated (images, audio) - copied verbatim into dist/
-src/global.d.ts       the window.__glow test hook contract
-tests/smoke.spec.ts   the smoke tests every build must pass
-scripts/check-workspace.mjs   repo hygiene guard behind `npm run check`
-deploy.sh             publish a build to one of the four slots
+index.html                    static canvas shell and show analytics beacon
+src/main.ts                   fixed-resolution Phaser configuration and scene order
+src/game.ts                   shared level, progression and test-state contracts
+src/audio.ts                  best-effort synthesized score and game cues
+src/textures.ts               runtime-generated player, seed, enemy, gate and world textures
+src/scenes/BootScene.ts       texture generation and immediate transition to title
+src/scenes/MenuScene.ts       title, compact controls and start interaction
+src/scenes/GameScene.ts       three chambers, movement, dash, enemies, damage and progression
+src/scenes/EndingScene.ts     resolved journey, final visual payoff and replay
+src/global.d.ts               bounded `window.__glow` browser-test state
+tests/smoke.spec.ts           end-to-end readiness and complete-game paths
+scripts/check-workspace.mjs   public-repo hygiene guard
+deploy.sh                     contestant-slot static deployment
 ```
 
-## How the scene works
+## Game loop
 
-`BootScene` is a vertical slice, not a contract - replace it freely, as long as `npm test` still passes.
+The player is a responsive light-being controlled by arrows/WASD or pointer targeting. Space or pointer-down performs a brief dash with a visible recharge ring. Each chamber has a deterministic seed arrangement, silhouette geometry, moving shadow hazards, a target seed count and a sealed gate. Seeds increase score, light radius and a persistent three-segment progress constellation. When the target is met the gate wakes; entering it advances to the next chamber.
 
-- **Lighting.** `this.lights.enable().setAmbientColor(0x0a0d18)` makes the world nearly black. Anything that should be lit calls `setPipeline("Light2D")`; the trees and the ground do. The light-being is *not* lit - it is a light *source*, drawn with `ADD` blending, with a `Phaser.GameObjects.Light` following it.
-- **Reveal loop.** Collecting a mote raises `collected`, which grows the light's `radius` and `intensity` and the sprite's scale. The world is revealed by the light, not by unhiding objects - that is the whole art direction in one mechanic.
-- **Assets.** The slice makes everything it needs at runtime, but a build may also ship files you generated - drop them in `public/assets/` and load them with a **relative** URL (`assets/...`, never `/assets/...`), because the same `dist/` is served from four different prefixes.
-- **Textures.** Everything the slice draws is drawn into canvas textures at `preload()` time from `src/textures.ts`: radial gradients for the glowing things, silhouette shapes for the trees and ground. Seeded `RandomDataGenerator` keeps them identical run to run, which keeps screenshots comparable.
-- **Input.** Pointer move and pointer down set a target the wisp eases toward; arrow keys move the same target. Pointer down also pulses the light.
-- **Test hook.** `reportState()` publishes `window.__glow` and `create()` sets `document.body.dataset.gameReady` after the first rendered frame. The smoke tests wait on that attribute. If you change the scene's state, keep the hook meaningful - it is the only thing standing between a broken build and a wasted judging round.
+Enemy contact during ordinary movement spends one spark, bursts the player into particles, and restarts the same chamber with its seed target restored after a short invulnerability window. Dash contact destroys a shadow instead. When sparks reach zero, the scene enters a fail overlay with an explicit retry action. Progression through a gate grants one spark up to the three-spark cap so recovery is possible without removing consequence.
 
-## Fixed resolution
+The third gate transitions to a dedicated ending scene. It resolves the collected-light arc visually, reports completion to the browser test hook, and offers replay. No stage requires network, storage, account state or imported content.
 
-The game runs at a **1280x720** design resolution with `Phaser.Scale.FIT`, letterboxed. `WORLD_WIDTH`/`WORLD_HEIGHT` in `BootScene.ts` are the single source of truth - the Phaser config imports them, so there is no second place to keep in sync.
+## Visual and audio systems
 
-Deterministic layout is deliberate: it makes screenshots comparable between machines, it means the owner plays the same framing on every build, and 720p is a clean source for the recorded judging sessions (`Scale.FIT` scales the canvas in CSS but leaves the backing store at the design resolution, so anything smaller records as an upscale). The resolution is mandated by [SPEC.md](SPEC.md) - do not change it.
+The three chambers share a restrained near-black world but have distinct colour temperatures, silhouette compositions, seed paths and enemy motion. World objects use Light2D; the additive player, seeds, gate core and particles act as light sources or luminous overlays. Parallax silhouettes, drifting spores, impact rings, gate rays, camera ease and limited shake carry motion without filling the frame with noise.
 
-## Constraints worth knowing before you refactor
+`audio.ts` lazily creates one browser AudioContext after user input. Oscillators and filtered noise synthesize seed notes, dash, damage, gate and ending cues. Missing or blocked audio leaves the complete game playable.
 
-- The production bundle serves from four URL prefixes, so never hardcode an absolute asset path or set `base` to `/`.
-- Everything in the build is made by you: draw or synthesize it in code, or generate it with an AI model and commit it under `public/assets/`. Never a downloaded sprite pack, stock texture or asset-store sound.
-- Private notes, journals and durable agent state live in your own workspace, never here. `npm run check` will stop you.
+## Test and deployment contract
+
+`window.__glow` exposes only fixed mechanical state: scene, ready, level, collected, target, sparks, score, dash readiness, gate state, ending state, player coordinates and active Light2D state. A bounded browser-test command surface drives deterministic progression and damage, while a separate smoke path starts and moves through real input. No internal timer, object reference or private browser state is exposed.
+
+The production build must pass workspace hygiene, ledger validation, strict typechecking and Playwright. The deployed slot must match the pushed build, render a 1280×720 canvas, reach every state without console/runtime/request failures, and retain explicit public directory/file modes.
+
+## Constraints
+
+- Never touch another contestant's repo, process or deploy slot.
+- Never put private workspace notes, credentials or agent state here.
+- Never download or ship another creator's textures, sprites, music or sound.
+- Keep all asset URLs relative and the build portable across the four judging prefixes.
+- Keep this page and the Round 2 changelog reconciled with every candidate change before push.

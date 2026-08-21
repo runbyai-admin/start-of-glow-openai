@@ -1,69 +1,87 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-/**
- * The smoke test contestants extend.
- *
- * It answers the only question the owner asks at judging time: does the build
- * actually come up and respond to input? Add your own tests beside it - keep
- * this one passing, a build that fails it is not playable.
- */
-
-test("boot scene comes up with the light pipeline running", async ({ page }) => {
-  const consoleErrors: string[] = [];
-  page.on("console", (msg) => {
-    // "Failed to load resource" carries no URL, so bad responses are checked
-    // through the response listener below instead.
-    if (msg.type() === "error" && !/Failed to load resource/.test(msg.text())) {
-      consoleErrors.push(msg.text());
-    }
+function collectErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && !/Failed to load resource/.test(message.text())) errors.push(message.text());
   });
-  page.on("pageerror", (err) => consoleErrors.push(String(err)));
-  // The analytics beacon is fire-and-forget and only accepted from the
-  // deployed origins, so its status off-production is not the game's problem.
-  page.on("response", (res) => {
-    if (res.status() >= 400 && !res.url().includes("/api/marketing/analytics/")) {
-      consoleErrors.push(`${res.status()} ${res.url()}`);
-    }
+  page.on("pageerror", (error) => errors.push(String(error)));
+  page.on("response", (response) => {
+    if (response.status() >= 400 && !response.url().includes("/api/marketing/analytics/")) errors.push(`${response.status()} ${response.url()}`);
   });
+  return errors;
+}
 
+async function ready(page: Page): Promise<void> {
   await page.goto("/", { waitUntil: "domcontentloaded" });
-
-  // The scene sets this once its first frame has been rendered.
   await page.waitForSelector("body[data-game-ready='true']", { timeout: 30_000 });
   await expect(page.locator("canvas")).toBeVisible();
+}
 
+test("title scene is immediate, lit and fixed at 1280 by 720", async ({ page }) => {
+  const errors = collectErrors(page);
+  await ready(page);
   const state = await page.evaluate(() => window.__glow);
-  expect(state?.ready).toBe(true);
-  expect(state?.lightsActive).toBe(true);
-  expect(state?.remaining).toBeGreaterThan(0);
-
-  await page.screenshot({ path: "test-results/boot-scene.png" });
-  expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
+  expect(state).toMatchObject({ ready: true, scene: "menu", status: "menu", lightsActive: true });
+  const canvas = page.locator("canvas");
+  await expect(canvas).toHaveAttribute("width", "1280");
+  await expect(canvas).toHaveAttribute("height", "720");
+  await page.screenshot({ path: "test-results/title.png" });
+  expect(errors).toEqual([]);
 });
 
-test("the light-being follows input and collects motes", async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("body[data-game-ready='true']", { timeout: 30_000 });
+test("real input starts play, moves the light and exposes the complete first chamber", async ({ page }) => {
+  const errors = collectErrors(page);
+  await ready(page);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => window.__glow?.scene === "game" && window.__glow.level === 1);
+  const before = await page.evaluate(() => window.__glow?.playerX ?? 0);
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("ArrowRight");
+  const after = await page.evaluate(() => window.__glow);
+  expect(after?.playerX).toBeGreaterThan(before + 15);
+  expect(after).toMatchObject({ status: "playing", level: 1, sparks: 3, target: 5, ending: false, lightsActive: true });
+  await page.screenshot({ path: "test-results/chamber-one.png" });
+  expect(errors).toEqual([]);
+});
 
-  const canvas = page.locator("canvas");
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-  const { x, y, width, height } = box!;
+test("three chamber progression reaches the authored ending", async ({ page }) => {
+  const errors = collectErrors(page);
+  await ready(page);
+  await page.evaluate(() => window.__glowCommand?.("start"));
+  await page.waitForFunction(() => window.__glow?.scene === "game");
 
-  // Sweep the pointer across the scene; the wisp chases it and eats whatever
-  // motes it passes through.
-  for (let i = 0; i <= 24; i += 1) {
-    const px = x + (width * i) / 24;
-    const py = y + height * (0.25 + 0.5 * Math.abs(Math.sin(i / 3)));
-    await page.mouse.move(px, py);
-    await page.waitForTimeout(60);
+  for (let level = 1; level <= 3; level += 1) {
+    await page.evaluate(() => window.__glowCommand?.("collectAll"));
+    await page.waitForFunction(() => window.__glow?.gateOpen === true);
+    const state = await page.evaluate(() => window.__glow);
+    expect(state?.collected).toBe(state?.target);
+    await page.evaluate(() => window.__glowCommand?.("enterGate"));
+    if (level < 3) await page.waitForFunction((nextLevel) => window.__glow?.scene === "game" && window.__glow.level === nextLevel, level + 1);
   }
-  await page.mouse.click(x + width / 2, y + height / 2);
-  await page.waitForTimeout(200);
 
-  const state = await page.evaluate(() => window.__glow);
-  expect(state?.collected, "the sweep should have collected at least one mote").toBeGreaterThan(0);
-  expect(state?.glowRadius).toBeGreaterThan(260);
+  await page.waitForFunction(() => window.__glow?.ending === true, undefined, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__glow)).toMatchObject({ scene: "ending", status: "ending", level: 3, ending: true, lightsActive: true });
+  await page.screenshot({ path: "test-results/ending.png" });
+  expect(errors).toEqual([]);
+});
 
-  await page.screenshot({ path: "test-results/after-input.png" });
+test("losing all sparks enters fail state and retry resets the journey", async ({ page }) => {
+  const errors = collectErrors(page);
+  await ready(page);
+  await page.evaluate(() => window.__glowCommand?.("start"));
+  await page.waitForFunction(() => window.__glow?.scene === "game");
+  await page.evaluate(() => {
+    window.__glowCommand?.("damage");
+    window.__glowCommand?.("damage");
+    window.__glowCommand?.("damage");
+  });
+  await page.waitForFunction(() => window.__glow?.status === "fail");
+  expect(await page.evaluate(() => window.__glow?.sparks)).toBe(0);
+  await page.screenshot({ path: "test-results/failure.png" });
+  await page.evaluate(() => window.__glowCommand?.("retry"));
+  await page.waitForFunction(() => window.__glow?.scene === "game" && window.__glow.level === 1 && window.__glow.sparks === 3);
+  expect(await page.evaluate(() => window.__glow)).toMatchObject({ status: "playing", collected: 0, score: 0 });
+  expect(errors).toEqual([]);
 });
