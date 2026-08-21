@@ -48,7 +48,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor() { super("game"); }
 
-  create(data: { level?: number; sparks?: number; score?: number; initialDirection?: { x: number; y: number } }): void {
+  create(data: { level?: number; sparks?: number; score?: number; initialDirection?: { x: number; y: number }; initialPointerTarget?: { x: number; y: number } }): void {
     this.levelIndex = Phaser.Math.Clamp(Math.floor(data.level ?? 0), 0, CHAMBERS.length - 1);
     this.sparks = Phaser.Math.Clamp(Math.floor(data.sparks ?? 3), 1, 3);
     this.score = Math.max(0, Math.floor(data.score ?? 0));
@@ -67,6 +67,19 @@ export class GameScene extends Phaser.Scene {
     this.buildSeeds();
     this.buildEnemies();
     this.buildPlayer();
+    if (data.initialPointerTarget) {
+      this.pointerTarget.set(
+        Phaser.Math.Clamp(data.initialPointerTarget.x, 28, WORLD_WIDTH - 28),
+        Phaser.Math.Clamp(data.initialPointerTarget.y, 32, WORLD_HEIGHT - 28),
+      );
+      this.pointerDriving = true;
+      const launchDirection = this.pointerTarget.clone().subtract(this.chamber.start);
+      if (launchDirection.length() > 9) {
+        launchDirection.normalize();
+        this.velocity.copy(launchDirection).scale(315);
+        this.dashDirection.copy(launchDirection);
+      }
+    }
     this.buildHud();
     this.bindInput();
     this.showChamberTitle();

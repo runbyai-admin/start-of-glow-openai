@@ -30,6 +30,17 @@ test("title scene is immediate, lit and fixed at 1280 by 720", async ({ page }) 
   expect(errors).toEqual([]);
 });
 
+test("first pointer click starts play and carries its destination into movement", async ({ page }) => {
+  const errors = collectErrors(page);
+  await ready(page);
+  await page.mouse.click(1000, 360);
+  await page.waitForFunction(() => window.__glow?.scene === "game" && window.__glow.level === 1);
+  await page.waitForFunction(() => (window.__glow?.playerX ?? 0) > 135);
+  expect(await page.evaluate(() => window.__glow)).toMatchObject({ status: "playing", level: 1, sparks: 3, dashReady: true, lightsActive: true });
+  await page.screenshot({ path: "test-results/pointer-start.png" });
+  expect(errors).toEqual([]);
+});
+
 test("real input starts play, moves the light and exposes the complete first chamber", async ({ page }) => {
   const errors = collectErrors(page);
   await ready(page);
@@ -37,11 +48,12 @@ test("real input starts play, moves the light and exposes the complete first cha
   await page.waitForFunction(() => window.__glow?.scene === "game" && window.__glow.level === 1);
   await page.waitForFunction(() => (window.__glow?.playerX ?? 0) > 135);
   await page.keyboard.up("ArrowRight");
-  await page.keyboard.press("Space");
-  await page.waitForTimeout(70);
+  await page.keyboard.down("Space");
+  await page.waitForFunction(() => window.__glow?.dashReady === false);
+  await page.keyboard.up("Space");
   const after = await page.evaluate(() => window.__glow);
   expect(after?.playerX).toBeGreaterThan(135);
-  expect(after).toMatchObject({ status: "playing", level: 1, sparks: 3, target: 5, dashReady: false, ending: false, lightsActive: true });
+  expect(after).toMatchObject({ status: "playing", level: 1, sparks: 3, target: 5, ending: false, lightsActive: true });
   await page.screenshot({ path: "test-results/chamber-one.png" });
   expect(errors).toEqual([]);
 });

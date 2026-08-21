@@ -36,8 +36,9 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
 
     const begin = () => this.begin();
-    start.on(Phaser.Input.Events.POINTER_DOWN, begin);
-    this.input.on(Phaser.Input.Events.POINTER_DOWN, begin);
+    const beginAtPointer = (pointer: Phaser.Input.Pointer) => this.begin(undefined, { x: pointer.worldX, y: pointer.worldY });
+    start.on(Phaser.Input.Events.POINTER_DOWN, beginAtPointer);
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, beginAtPointer);
     this.input.keyboard?.once("keydown-ENTER", begin);
     this.input.keyboard?.once("keydown-SPACE", begin);
     for (const [key, x, y] of [
@@ -63,12 +64,12 @@ export class MenuScene extends Phaser.Scene {
     dust.setDepth(1);
   }
 
-  private begin(initialDirection?: { x: number; y: number }): void {
+  private begin(initialDirection?: { x: number; y: number }, initialPointerTarget?: { x: number; y: number }): void {
     if (this.started) return;
     this.started = true;
     glowAudio.unlock();
     glowAudio.note(220, 0.45, "sine", 0.2);
     this.cameras.main.fadeOut(360, 4, 5, 11);
-    this.time.delayedCall(360, () => this.scene.start("game", { level: 0, sparks: 3, score: 0, initialDirection }));
+    this.time.delayedCall(360, () => this.scene.start("game", { level: 0, sparks: 3, score: 0, initialDirection, initialPointerTarget }));
   }
 }
