@@ -23,6 +23,7 @@ export class GameScene extends Phaser.Scene {
   private collected = 0;
   private status: "playing" | "transition" | "fail" = "playing";
   private player!: Phaser.GameObjects.Image;
+  private playerHalo!: Phaser.GameObjects.Image;
   private playerLight!: Phaser.GameObjects.Light;
   private trail!: Phaser.GameObjects.Particles.ParticleEmitter;
   private burst!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -129,6 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.burst.setDepth(11);
     this.trail = this.add.particles(0, 0, "spark", { speed: { min: 8, max: 35 }, lifespan: { min: 420, max: 980 }, scale: { start: 0.52, end: 0 }, alpha: { start: 0.65, end: 0 }, tint: [0xffffff, this.chamber.glow], blendMode: Phaser.BlendModes.ADD, frequency: 28, emitZone: { type: "random", source: new Phaser.Geom.Circle(0, 0, 15), quantity: 1 } });
     this.trail.setDepth(8);
+    this.playerHalo = this.add.image(this.chamber.start.x, this.chamber.start.y, "halo").setScale(0.58 + this.levelIndex * 0.04).setTint(this.chamber.glow).setAlpha(0.34).setBlendMode(Phaser.BlendModes.ADD).setDepth(9);
     this.player = this.add.image(this.chamber.start.x, this.chamber.start.y, "wisp").setScale(0.53 + this.levelIndex * 0.05).setTint(this.chamber.glow).setBlendMode(Phaser.BlendModes.ADD).setDepth(10);
     this.playerLight = this.lights.addLight(this.player.x, this.player.y, 255 + this.levelIndex * 45, this.chamber.glow, 1.9);
     this.trail.startFollow(this.player);
@@ -186,7 +188,15 @@ export class GameScene extends Phaser.Scene {
     this.player.x = Phaser.Math.Clamp(this.player.x + this.velocity.x * delta / 1000, 28, WORLD_WIDTH - 28);
     this.player.y = Phaser.Math.Clamp(this.player.y + this.velocity.y * delta / 1000, 32, WORLD_HEIGHT - 28);
     this.player.rotation = Phaser.Math.Angle.RotateTo(this.player.rotation, Math.atan2(this.velocity.y, this.velocity.x) + Math.PI / 2, 0.08);
+    const speedRatio = Phaser.Math.Clamp(this.velocity.length() / 790, 0, 1);
+    const breath = Math.sin(time * 0.0055);
+    const baseScale = 0.53 + this.levelIndex * 0.05;
+    this.player.setScale(baseScale * (1 - speedRatio * 0.08 + breath * 0.025), baseScale * (1 + speedRatio * 0.2 + breath * 0.04));
+    this.playerHalo.setPosition(this.player.x, this.player.y).setRotation(-this.player.rotation * 0.18);
+    this.playerHalo.setScale((0.58 + this.levelIndex * 0.04) * (1 + breath * 0.07 + speedRatio * 0.16));
+    this.playerHalo.setAlpha(0.28 + (breath + 1) * 0.055 + speedRatio * 0.08);
     this.playerLight.setPosition(this.player.x, this.player.y);
+    this.playerLight.radius = 255 + this.levelIndex * 45 + this.collected * 19 + breath * 8 + speedRatio * 18;
     this.player.setAlpha(time < this.invulnerableUntil && Math.floor(time / 70) % 2 === 0 ? 0.28 : 1);
 
     this.updateEnemies(time, dashing);
@@ -271,9 +281,32 @@ export class GameScene extends Phaser.Scene {
     this.dashUntil = now + 190;
     this.dashReadyAt = now + 920;
     this.trail.explode(24, this.player.x, this.player.y);
+    for (let index = 0; index < 3; index += 1) {
+      this.time.delayedCall(index * 42, () => this.emitDashEcho(index));
+    }
     this.playerLight.intensity = 3.2;
     this.time.delayedCall(210, () => { if (this.playerLight) this.playerLight.intensity = 1.9 + this.collected * 0.05; });
     glowAudio.dash();
+  }
+
+  private emitDashEcho(index: number): void {
+    if (this.status !== "playing" || !this.player.active) return;
+    const echo = this.add.image(this.player.x, this.player.y, "wisp")
+      .setScale(0.48 + this.levelIndex * 0.05)
+      .setRotation(this.player.rotation)
+      .setTint(this.chamber.glow)
+      .setAlpha(0.34 - index * 0.06)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(9);
+    this.tweens.add({
+      targets: echo,
+      alpha: 0,
+      scaleX: echo.scaleX * 1.45,
+      scaleY: echo.scaleY * 1.75,
+      duration: 260,
+      ease: "Quad.easeOut",
+      onComplete: () => echo.destroy(),
+    });
   }
 
   private takeDamage(testForced: boolean): void {

@@ -1,6 +1,6 @@
 # Architecture
 
-This is the public map of the current Round 2 candidate.
+This is the public map of the current Round 1 candidate.
 
 ## Product shape
 
@@ -41,7 +41,7 @@ deploy.sh                     contestant-slot static deployment
 
 ## Game loop
 
-The player is a responsive light-being controlled by arrows/WASD or pointer targeting. Space or pointer-down performs a brief dash with a visible recharge ring. Each chamber has a deterministic seed arrangement, silhouette geometry, moving shadow hazards, a target seed count and a sealed gate. Seeds increase score, light radius and a persistent three-segment progress constellation. When the target is met the gate wakes; entering it advances to the next chamber.
+The player is a responsive light-being controlled by arrows/WASD or pointer targeting. Its core and translucent halo breathe while idle, stretch with velocity, and leave short fading echoes during a dash so input reads in the character before it reads in the scenery. Space or pointer-down performs the dash with a visible recharge ring. Each chamber has a deterministic seed arrangement, silhouette geometry, moving shadow hazards, a target seed count and a sealed gate. Seeds increase score, light radius and a persistent three-segment progress constellation. When the target is met the gate wakes; entering it advances to the next chamber.
 
 Enemy contact during ordinary movement spends one spark, bursts the player into particles, and restarts the same chamber with its seed target restored after a short invulnerability window. Dash contact destroys a shadow instead. When sparks reach zero, the scene enters a fail overlay with an explicit retry action. Progression through a gate grants one spark up to the three-spark cap so recovery is possible without removing consequence.
 
@@ -55,7 +55,7 @@ The three chambers share a restrained near-black world but have distinct colour 
 
 ## Test and deployment contract
 
-`window.__glow` exposes only fixed mechanical state: scene, ready, level, collected, target, sparks, score, dash readiness, gate state, ending state, player coordinates and active Light2D state. A bounded browser-test command surface drives deterministic progression and damage, while a separate smoke path starts and moves through real input. No internal timer, object reference or private browser state is exposed.
+`window.__glow` exposes only fixed mechanical state: scene, ready, level, collected, target, sparks, score, dash readiness, gate state, ending state, player coordinates and active Light2D state. A bounded browser-test command surface drives deterministic progression and damage, while separate smoke paths start, move and dash through real input. The visual-feel proof is screenshot-based and adds no internal visual object or timer to the hook.
 
 The production build must pass workspace hygiene, ledger validation, strict typechecking and Playwright. The deployed slot must match the pushed build, render a 1280×720 canvas, reach every state without console/runtime/request failures, and retain explicit public directory/file modes.
 
@@ -65,4 +65,4 @@ The production build must pass workspace hygiene, ledger validation, strict type
 - Never put private workspace notes, credentials or agent state here.
 - Never download or ship another creator's textures, sprites, music or sound.
 - Keep all asset URLs relative and the build portable across the four judging prefixes.
-- Keep this page and the Round 2 changelog reconciled with every candidate change before push.
+- Keep this page and the Round 1 changelog reconciled with every candidate change before push.

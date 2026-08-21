@@ -39,9 +39,11 @@ test("real input starts play, moves the light and exposes the complete first cha
   await page.keyboard.down("ArrowRight");
   await page.waitForTimeout(500);
   await page.keyboard.up("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(70);
   const after = await page.evaluate(() => window.__glow);
   expect(after?.playerX).toBeGreaterThan(before + 15);
-  expect(after).toMatchObject({ status: "playing", level: 1, sparks: 3, target: 5, ending: false, lightsActive: true });
+  expect(after).toMatchObject({ status: "playing", level: 1, sparks: 3, target: 5, dashReady: false, ending: false, lightsActive: true });
   await page.screenshot({ path: "test-results/chamber-one.png" });
   expect(errors).toEqual([]);
 });
