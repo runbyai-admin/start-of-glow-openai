@@ -25,7 +25,7 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: "ui-monospace, monospace", fontSize: "16px", color: "#7994a8", letterSpacing: 5,
     }).setOrigin(0.5).setDepth(5);
 
-    const start = this.add.text(WORLD_WIDTH / 2, 565, "ENTER  /  CLICK TO BEGIN", {
+    const start = this.add.text(WORLD_WIDTH / 2, 565, "MOVE  /  ENTER  /  CLICK TO BEGIN", {
       fontFamily: "ui-monospace, monospace", fontSize: "20px", color: "#ffe0a0", letterSpacing: 3,
       backgroundColor: "#12182acc", padding: { x: 24, y: 14 },
     }).setOrigin(0.5).setDepth(5).setInteractive({ useHandCursor: true });
@@ -40,6 +40,12 @@ export class MenuScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, begin);
     this.input.keyboard?.once("keydown-ENTER", begin);
     this.input.keyboard?.once("keydown-SPACE", begin);
+    for (const [key, x, y] of [
+      ["UP", 0, -1], ["W", 0, -1], ["DOWN", 0, 1], ["S", 0, 1],
+      ["LEFT", -1, 0], ["A", -1, 0], ["RIGHT", 1, 0], ["D", 1, 0],
+    ] as const) {
+      this.input.keyboard?.once(`keydown-${key}`, () => this.begin({ x, y }));
+    }
 
     window.__glowCommand = (command) => { if (command === "start") this.begin(); };
     this.events.once(Phaser.Scenes.Events.POST_UPDATE, () => {
@@ -57,12 +63,12 @@ export class MenuScene extends Phaser.Scene {
     dust.setDepth(1);
   }
 
-  private begin(): void {
+  private begin(initialDirection?: { x: number; y: number }): void {
     if (this.started) return;
     this.started = true;
     glowAudio.unlock();
     glowAudio.note(220, 0.45, "sine", 0.2);
     this.cameras.main.fadeOut(360, 4, 5, 11);
-    this.time.delayedCall(360, () => this.scene.start("game", { level: 0, sparks: 3, score: 0 }));
+    this.time.delayedCall(360, () => this.scene.start("game", { level: 0, sparks: 3, score: 0, initialDirection }));
   }
 }

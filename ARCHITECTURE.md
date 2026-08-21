@@ -6,7 +6,7 @@ This is the public map of the current Round 1 candidate.
 
 Start of Glow is a complete short-form top-down action journey, designed to show its full arc in a judging session while remaining replayable:
 
-1. a title scene starts immediately with keyboard or pointer;
+1. a title scene accepts the first movement, Enter, Space or pointer input immediately;
 2. three distinct chambers ask the player to gather light seeds while avoiding shadow creatures;
 3. collected light unlocks the chamber gate and carries permanent glow progression forward;
 4. contact spends one of three sparks and resets the current chamber after a short recovery; losing all sparks enters a clear retry state;
@@ -41,7 +41,7 @@ deploy.sh                     contestant-slot static deployment
 
 ## Game loop
 
-The player is a responsive light-being controlled by arrows/WASD or pointer targeting. Its core and translucent halo breathe while idle, stretch with velocity, and leave short fading echoes during a dash so input reads in the character before it reads in the scenery. Space or pointer-down performs the dash with a visible recharge ring. Each chamber has a deterministic seed arrangement, silhouette geometry, moving shadow hazards, a target seed count and a sealed gate. Seeds increase score, light radius and a persistent three-segment progress constellation. When the target is met the gate wakes; entering it advances to the next chamber.
+The title treats a held arrow or WASD key as both start intent and movement input, so the same first action flows through the short fade into chamber motion; Enter, Space and pointer start remain available. In play, the responsive light-being follows arrows/WASD or pointer targeting. Its core and translucent halo breathe while idle, stretch with velocity, and leave short fading echoes during a dash so input reads in the character before it reads in the scenery. Space or pointer-down performs the dash with a visible recharge ring. Each chamber has a deterministic seed arrangement, silhouette geometry, moving shadow hazards, a target seed count and a sealed gate. Seeds increase score, light radius and a persistent three-segment progress constellation. When the target is met the gate wakes; entering it advances to the next chamber.
 
 Enemy contact during ordinary movement spends one spark, bursts the player into particles, and restarts the same chamber with its seed target restored after a short invulnerability window. Dash contact destroys a shadow instead. When sparks reach zero, the scene enters a fail overlay with an explicit retry action. Progression through a gate grants one spark up to the three-spark cap so recovery is possible without removing consequence.
 
@@ -55,7 +55,7 @@ The three chambers share a restrained near-black world but have distinct colour 
 
 ## Test and deployment contract
 
-`window.__glow` exposes only fixed mechanical state: scene, ready, level, collected, target, sparks, score, dash readiness, gate state, ending state, player coordinates and active Light2D state. A bounded browser-test command surface drives deterministic progression and damage, while separate smoke paths start, move and dash through real input. The visual-feel proof is screenshot-based and adds no internal visual object or timer to the hook.
+`window.__glow` exposes only fixed mechanical state: scene, ready, level, collected, target, sparks, score, dash readiness, gate state, ending state, player coordinates and active Light2D state. A bounded browser-test command surface drives deterministic progression and damage, while the primary real-input smoke path holds one movement key from the title through visible chamber displacement before testing dash. The visual-feel proof is screenshot-based and adds no internal visual object or timer to the hook.
 
 The production build must pass workspace hygiene, ledger validation, strict typechecking and Playwright. The deployed slot must match the pushed build, render a 1280×720 canvas, reach every state without console/runtime/request failures, and retain explicit public directory/file modes.
 

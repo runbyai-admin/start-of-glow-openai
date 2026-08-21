@@ -48,7 +48,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor() { super("game"); }
 
-  create(data: { level?: number; sparks?: number; score?: number }): void {
+  create(data: { level?: number; sparks?: number; score?: number; initialDirection?: { x: number; y: number } }): void {
     this.levelIndex = Phaser.Math.Clamp(Math.floor(data.level ?? 0), 0, CHAMBERS.length - 1);
     this.sparks = Phaser.Math.Clamp(Math.floor(data.sparks ?? 3), 1, 3);
     this.score = Math.max(0, Math.floor(data.score ?? 0));
@@ -56,7 +56,9 @@ export class GameScene extends Phaser.Scene {
     this.status = "playing";
     this.collected = 0;
     this.gateOpen = false;
-    this.velocity.set(0, 0);
+    const initialDirection = data.initialDirection;
+    this.velocity.set((initialDirection?.x ?? 0) * 315, (initialDirection?.y ?? 0) * 315);
+    if (initialDirection) this.dashDirection.set(initialDirection.x, initialDirection.y);
     this.cameras.main.setBackgroundColor(this.chamber.ambient);
     this.lights.enable().setAmbientColor(this.chamber.ambient);
 
