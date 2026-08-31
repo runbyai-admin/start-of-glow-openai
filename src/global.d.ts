@@ -37,6 +37,10 @@ interface GlowTestState {
   /** Number of cap waves released in this level attempt and hazards currently slowed. */
   radianceWaves?: number;
   slowedHazards?: number;
+  /** Moonwell world state: currents disappear as their stones wake. */
+  echoesAwake?: number;
+  echoesRequired?: number;
+  inCurrent?: boolean;
 }
 
 interface Window {

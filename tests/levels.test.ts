@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LEVEL_1_LAYOUT, LEVEL_2_LAYOUT, LEVEL_3_LAYOUT, type LevelLayout } from "../src/levels.ts";
+import { LEVEL_1_LAYOUT, LEVEL_2_LAYOUT, LEVEL_3_LAYOUT, LEVEL_4_LAYOUT, LEVELS, type LevelLayout } from "../src/levels.ts";
 
 function distanceToSegment(
   point: { x: number; y: number },
@@ -82,4 +82,13 @@ test("level 1 keeps ten required motes safe and four pull-pocket choices risky",
 
 test("level 3 has a sixteen-mote safe detour and six paid-gate choices", () => {
   assertRouteContract(LEVEL_3_LAYOUT, 16, 6, 6);
+});
+
+test("level 4 is a new moonwell act with three alternating current switches", () => {
+  assert.equal(LEVEL_4_LAYOUT.motes.length, 18);
+  assert.equal(LEVEL_4_LAYOUT.hazards.length, 3);
+  const moonwell = LEVELS[3];
+  assert.equal(moonwell.mood, "moonwell");
+  assert.deepEqual(moonwell.echoStones?.map((stone) => stone.pushY), [1, -1, 1]);
+  assert.equal(moonwell.requiredMotes, 14);
 });

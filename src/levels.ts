@@ -31,7 +31,12 @@ export interface LevelConfig {
   /** CSS px/second along each hazard's patrol path. */
   hazardSpeed: number;
   /** Sky seed, forest tint, and - for storm-dark - a real weather layer (see LevelScene.buildStorm). */
-  mood: "dusk" | "deep-night" | "storm-dark";
+  mood: "dusk" | "deep-night" | "storm-dark" | "moonwell";
+  /**
+   * Moonwell-only world switches. Rekindled reach spent near one wakes it,
+   * permanently stilling the cross-current around that stone.
+   */
+  echoStones?: Array<{ x: number; y: number; pushY: -1 | 1 }>;
   layout?: LevelLayout;
 }
 
@@ -197,6 +202,53 @@ export const LEVEL_3_LAYOUT: LevelLayout = {
   ],
 };
 
+/**
+ * Act two begins outside the trees. The required light traces one broad wave
+ * across a flooded basin; three moonstones sit at the wave's crossings. Their
+ * currents push alternately down/up/down until the player spends rekindled reach
+ * beside each stone. Four optional motes sit in the strongest water.
+ */
+export const LEVEL_4_LAYOUT: LevelLayout = {
+  motes: [
+    { x: 320, y: 470 },
+    { x: 470, y: 500 },
+    { x: 600, y: 460 },
+    { x: 760, y: 370 },
+    { x: 900, y: 270 },
+    { x: 1050, y: 235 },
+    { x: 1190, y: 285 },
+    { x: 1360, y: 400 },
+    { x: 1510, y: 505 },
+    { x: 1660, y: 535 },
+    { x: 1810, y: 470 },
+    { x: 1970, y: 360 },
+    { x: 2120, y: 280 },
+    { x: 2240, y: 245 },
+    // Optional light suspended in the three strongest currents.
+    { x: 650, y: 160 },
+    { x: 1260, y: 590 },
+    { x: 1900, y: 150 },
+    { x: 1980, y: 560 },
+  ],
+  hazards: [
+    [
+      { x: 760, y: 610 },
+      { x: 1050, y: 610 },
+      { x: 900, y: 545 },
+    ],
+    [
+      { x: 1420, y: 105 },
+      { x: 1710, y: 105 },
+      { x: 1570, y: 175 },
+    ],
+    [
+      { x: 1990, y: 610 },
+      { x: 2280, y: 610 },
+      { x: 2140, y: 535 },
+    ],
+  ],
+};
+
 export const LEVELS: LevelConfig[] = [
   {
     index: 1,
@@ -227,6 +279,21 @@ export const LEVELS: LevelConfig[] = [
     hazardSpeed: 120,
     mood: "storm-dark",
     layout: LEVEL_3_LAYOUT,
+  },
+  {
+    index: 4,
+    name: "The Moonwell",
+    moteCount: 18,
+    requiredMotes: 14,
+    hazardCount: 3,
+    hazardSpeed: 105,
+    mood: "moonwell",
+    echoStones: [
+      { x: 650, y: 350, pushY: 1 },
+      { x: 1300, y: 350, pushY: -1 },
+      { x: 1900, y: 350, pushY: 1 },
+    ],
+    layout: LEVEL_4_LAYOUT,
   },
 ];
 

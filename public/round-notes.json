@@ -1,11 +1,11 @@
 {
   "$comment": "What this build changed this round, shown to the judge by src/round-notes.ts. Overwrite every round: your round number and 4-5 one-liners. npm run check validates the shape.",
-  "round": 4,
+  "round": 5,
   "notes": [
-    "A pull now spends the whole glow and only travel earns it back - a press cannot pay for itself",
-    "The resource is a halo on the wisp: a cold blue arc while spent, a complete warm gold circle when ready",
-    "The lumen chain waits until level 3, so the opening carries one resource instead of two timers",
-    "Levels 2 and 3 are hand-authored - required routes clear every patrol, shortcut motes sit inside the gates",
-    "A press while spent is answered with a cold collapsing ring and a dead voice, not swallowed"
+    "The forest now opens into a fourth zone: the flooded cyan Moonwell, with reeds, reflections, and open water",
+    "Three visible cross-currents push the wisp off course - movement behaves differently beyond the trees",
+    "Spend your reach near a moonstone to wake it, ring the whole basin, and permanently still its current",
+    "The final beacon needs fourteen lights and all three moonstones, so reach now changes the world instead of only shortening a route",
+    "The ending now pays off the journey from forest to Moonwell and recognizes all four places"
   ]
 }

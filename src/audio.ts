@@ -304,6 +304,31 @@ export class Ambience {
     }
   }
 
+  /** A moonstone answering the player's spent reach: low water tone, then a glass octave. */
+  echoAwake(step: number): void {
+    if (!this.ctx || !this.master) return;
+    try {
+      const now = this.ctx.currentTime;
+      const root = [174.61, 220, 261.63][Math.max(0, Math.min(2, step - 1))];
+      [root, root * 1.5, root * 2].forEach((frequency, index) => {
+        const osc = this.ctx!.createOscillator();
+        osc.type = index === 0 ? "triangle" : "sine";
+        osc.frequency.setValueAtTime(frequency * 0.82, now + index * 0.11);
+        osc.frequency.exponentialRampToValueAtTime(frequency, now + 0.48 + index * 0.11);
+        const gain = this.ctx!.createGain();
+        gain.gain.setValueAtTime(0.0001, now + index * 0.11);
+        gain.gain.linearRampToValueAtTime(0.11 - index * 0.018, now + 0.08 + index * 0.11);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.35 + index * 0.15);
+        osc.connect(gain);
+        gain.connect(this.master!);
+        osc.start(now + index * 0.11);
+        osc.stop(now + 1.55 + index * 0.15);
+      });
+    } catch {
+      /* atmosphere only */
+    }
+  }
+
   /**
    * A quick rising arpeggio - the level-complete payoff. A flawless level
    * (every mote found, not just the required ones) earns two extra steps up:

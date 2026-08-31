@@ -78,6 +78,21 @@ const GATHER_MAX_MOTES = 4;
 /** Per-mote stagger on the way in - the cascade is the reward, so it lands as notes, not a chord. */
 const GATHER_STAGGER_MS = 62;
 const GATHER_FLIGHT_MS = 300;
+const ECHO_WAKE_RADIUS = 265;
+const CURRENT_HALF_WIDTH = 125;
+const CURRENT_HALF_HEIGHT = 285;
+const CURRENT_PUSH_SPEED = 210;
+
+interface EchoStone {
+  x: number;
+  y: number;
+  pushY: -1 | 1;
+  awake: boolean;
+  core: Phaser.GameObjects.Image;
+  ring: Phaser.GameObjects.Graphics;
+  light: Phaser.GameObjects.Light;
+  current: Phaser.GameObjects.TileSprite;
+}
 
 interface LevelInitData {
   levelIndex: number;
@@ -94,6 +109,7 @@ const MOOD_TINT: Record<LevelConfig["mood"], { tree: number[]; ground: number; h
   dusk: { tree: [0x1b2438, 0x161d2e, 0x141a2a], ground: 0x10151f, hillsTint: 0x0d1526 },
   "deep-night": { tree: [0x141a2c, 0x101624, 0x0e1220], ground: 0x0b0f18, hillsTint: 0x0a0f1e },
   "storm-dark": { tree: [0x171226, 0x120e1e, 0x0f0c1a], ground: 0x0d0a16, hillsTint: 0x120c22 },
+  moonwell: { tree: [0x112b3a, 0x0b2230, 0x091a27], ground: 0x061a25, hillsTint: 0x102b3d },
 };
 
 /**
@@ -128,6 +144,9 @@ export class LevelScene extends Phaser.Scene {
     pressure: number;
     slowUntil: number;
   }> = [];
+  private echoStones: EchoStone[] = [];
+  private inCurrent = false;
+  private echoHint?: Phaser.GameObjects.Text;
 
   private hud!: Phaser.GameObjects.Text;
   private levelCard!: Phaser.GameObjects.Text;
@@ -201,6 +220,9 @@ export class LevelScene extends Phaser.Scene {
     this.motes = [];
     this.incoming = [];
     this.hazards = [];
+    this.echoStones = [];
+    this.inCurrent = false;
+    this.echoHint = undefined;
     this.target.set(START_X, START_Y);
   }
 
@@ -210,6 +232,7 @@ export class LevelScene extends Phaser.Scene {
     makeGlowTexture(this, "spark", 16, "rgba(255,255,255,0.9)", "rgba(190,226,255,0.35)");
     makeGlowTexture(this, "firefly", 12, "rgba(226,255,196,1)", "rgba(198,255,130,0.4)");
     makeGlowTexture(this, "beacon", 170, "rgba(255,226,168,1)", "rgba(255,182,102,0.4)");
+    makeGlowTexture(this, "echo-stone", 110, "rgba(205,252,255,1)", "rgba(72,216,235,0.48)");
     makeGlowTexture(this, "shadow-spark", 10, "rgba(150,110,220,0.85)", "rgba(90,50,150,0.3)");
     makeHazardTexture(this, `hazard-${this.config.index}`, 30, this.config.index * 97);
     makeSkyTexture(this, "sky", VIEW_WIDTH, VIEW_HEIGHT, 11);
@@ -230,6 +253,7 @@ export class LevelScene extends Phaser.Scene {
     this.buildBeacon();
     this.buildFireflies();
     this.buildMotes();
+    this.buildEchoStones();
     this.buildWisp();
     this.buildHazards();
     this.buildStorm();
@@ -255,6 +279,10 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private buildForest(): void {
+    if (this.config.mood === "moonwell") {
+      this.buildMoonwell();
+      return;
+    }
     const rng = new Phaser.Math.RandomDataGenerator([`start-of-glow-trees-${this.config.index}`]);
     const tints = MOOD_TINT[this.config.mood].tree;
     for (let i = 0; i < TREE_COUNT; i += 1) {
@@ -274,6 +302,97 @@ export class LevelScene extends Phaser.Scene {
       .setTint(MOOD_TINT[this.config.mood].ground)
       .setDepth(-10);
     ground.setPipeline("Light2D");
+  }
+
+  /**
+   * The first place beyond the forest: a continuous flooded basin with a pale
+   * horizon, moon reflections, reed banks and no tree silhouettes. It uses
+   * primitive/vector texture work so the zone stays crisp and deterministic.
+   */
+  private buildMoonwell(): void {
+    const water = this.add
+      .rectangle(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.61, WORLD_WIDTH, WORLD_HEIGHT * 0.78, 0x071b29)
+      .setDepth(-32);
+    water.setPipeline("Light2D");
+
+    const horizon = this.add.graphics().setDepth(-33);
+    horizon.fillStyle(0x16394b, 0.72);
+    horizon.fillEllipse(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.61, WORLD_WIDTH * 1.25, 360);
+    horizon.fillStyle(0x8bd7dd, 0.08);
+    horizon.fillEllipse(WORLD_WIDTH * 0.78, WORLD_HEIGHT * 0.28, 430, 90);
+
+    const ripples = this.add.graphics().setDepth(-14);
+    for (let x = 40; x < WORLD_WIDTH; x += 150) {
+      const y = 170 + ((x * 37) % 430);
+      const width = 34 + ((x * 13) % 58);
+      ripples.lineStyle(2, x % 300 === 40 ? 0x8edbe2 : 0x3b8798, 0.18);
+      ripples.strokeEllipse(x, y, width, 8);
+    }
+
+    const banks = this.add.graphics().setDepth(-12);
+    banks.fillStyle(0x07131c, 1);
+    banks.fillRect(0, 0, WORLD_WIDTH, 75);
+    banks.fillRect(0, WORLD_HEIGHT - 58, WORLD_WIDTH, 58);
+    banks.lineStyle(5, 0x2c6571, 0.42);
+    banks.lineBetween(0, 76, WORLD_WIDTH, 76);
+    banks.lineBetween(0, WORLD_HEIGHT - 60, WORLD_WIDTH, WORLD_HEIGHT - 60);
+    for (let x = 40; x < WORLD_WIDTH; x += 88) {
+      const topHeight = 26 + ((x * 17) % 48);
+      banks.lineStyle(4, 0x163d46, 0.75);
+      banks.lineBetween(x, 76, x - 8, 76 - topHeight);
+      banks.lineBetween(x + 28, WORLD_HEIGHT - 60, x + 38, WORLD_HEIGHT - 60 + topHeight);
+    }
+  }
+
+  /** Three permanent world switches and their visible cross-currents. */
+  private buildEchoStones(): void {
+    if (!this.config.echoStones?.length) return;
+    const currentKey = "moon-current";
+    if (!this.textures.exists(currentKey)) {
+      const texture = this.textures.createCanvas(currentKey, 128, 128)!;
+      const ctx = texture.getContext();
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.strokeStyle = "rgba(116,224,235,0.3)";
+      ctx.lineWidth = 2;
+      for (let y = 12; y < 128; y += 24) {
+        ctx.beginPath();
+        ctx.moveTo(4, y);
+        ctx.bezierCurveTo(34, y - 9, 88, y + 9, 124, y);
+        ctx.stroke();
+      }
+      texture.refresh();
+    }
+
+    for (const cfg of this.config.echoStones) {
+      const current = this.add
+        .tileSprite(cfg.x, cfg.y, CURRENT_HALF_WIDTH * 2, CURRENT_HALF_HEIGHT * 2, currentKey)
+        .setTint(cfg.pushY > 0 ? 0x75d5e2 : 0x9fe8dd)
+        .setAlpha(0.42)
+        .setDepth(-4);
+      const ring = this.add.graphics().setDepth(3);
+      ring.lineStyle(3, 0x6ccbd8, 0.55);
+      ring.strokeCircle(cfg.x, cfg.y, 56);
+      ring.lineStyle(1, 0xb7f8ff, 0.22);
+      ring.strokeCircle(cfg.x, cfg.y, ECHO_WAKE_RADIUS);
+      const core = this.add
+        .image(cfg.x, cfg.y, "echo-stone")
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0x6c9aa8)
+        .setAlpha(0.32)
+        .setScale(0.62)
+        .setDepth(4);
+      const light = this.lights.addLight(cfg.x, cfg.y, 115, 0x6ad9e8, 0.28);
+      this.echoStones.push({ ...cfg, awake: false, core, ring, light, current });
+      this.tweens.add({
+        targets: core,
+        alpha: { from: 0.22, to: 0.42 },
+        scale: { from: 0.58, to: 0.66 },
+        duration: 1250,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+    }
   }
 
   /** Dark until every mote in the level is found - then it lights, and pulls the player in for the arrival. */
@@ -677,6 +796,28 @@ export class LevelScene extends Phaser.Scene {
         .setScrollFactor(0);
     }
 
+    if (this.config.mood === "moonwell") {
+      this.echoHint = this.add
+        .text(VIEW_WIDTH / 2, VIEW_HEIGHT - 54, "spend your reach near each moonstone", {
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "17px",
+          color: "#bdf8ff",
+        })
+        .setOrigin(0.5)
+        .setAlpha(0)
+        .setDepth(100)
+        .setScrollFactor(0);
+      this.tweens.add({
+        targets: this.echoHint,
+        alpha: { from: 0, to: 0.82 },
+        duration: 800,
+        delay: 1000,
+        yoyo: true,
+        hold: 2600,
+        ease: "Sine.easeInOut",
+      });
+    }
+
     this.chainArc = this.add.graphics().setDepth(95).setScrollFactor(0);
     this.chainText = this.add.text(VIEW_WIDTH - 28, 24, "", {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -721,7 +862,15 @@ export class LevelScene extends Phaser.Scene {
   private gather(): void {
     if (this.locked || this.time.now < this.gatherReadyAt) return;
     this.gatherReadyAt = this.time.now + GATHER_COOLDOWN_MS;
-    if (!reachReady(this.reach)) {
+    // Unlike pulling loose light, a moonstone will accept any reach that has
+    // begun to rekindle. That makes the late-act choice "spend what I have to
+    // still the current" rather than forcing a hidden exact-full threshold.
+    const echo = this.reach >= REACH_MIN + 24
+      ? this.echoStones.find(
+        (stone) => !stone.awake && Phaser.Math.Distance.Between(stone.x, stone.y, this.wisp.x, this.wisp.y) <= ECHO_WAKE_RADIUS,
+      )
+      : undefined;
+    if (!reachReady(this.reach) && !echo) {
       this.deniedGathers += 1;
       this.gatherDenied();
       this.reportState();
@@ -737,13 +886,18 @@ export class LevelScene extends Phaser.Scene {
     }
 
     const caught: Array<{ mote: Phaser.GameObjects.Image; d: number }> = [];
-    for (let i = this.motes.length - 1; i >= 0; i -= 1) {
-      const mote = this.motes[i];
-      const d = Phaser.Math.Distance.Between(mote.x, mote.y, this.wisp.x, this.wisp.y);
-      if (d > this.reach) continue;
-      this.motes.splice(i, 1);
-      this.incoming.push(mote);
-      caught.push({ mote, d });
+    // A moonstone takes the whole reach into the world. It does not also pull
+    // nearby motes: leaving those lights in place gives the player the visible
+    // route that rekindles the next world-changing spend.
+    if (!echo) {
+      for (let i = this.motes.length - 1; i >= 0; i -= 1) {
+        const mote = this.motes[i];
+        const d = Phaser.Math.Distance.Between(mote.x, mote.y, this.wisp.x, this.wisp.y);
+        if (d > this.reach) continue;
+        this.motes.splice(i, 1);
+        this.incoming.push(mote);
+        caught.push({ mote, d });
+      }
     }
     caught.sort((a, b) => a.d - b.d);
     // A reach takes an armful, not a room. The overflow goes straight back so
@@ -756,6 +910,7 @@ export class LevelScene extends Phaser.Scene {
 
     const spent = this.reach;
     this.setReach(spendReach(this.reach));
+    if (echo) this.wakeEcho(echo);
     this.gatherWave(spent, caught.length);
     this.ambience.gather(caught.length);
     this.pulseBoost = caught.length > 0 ? 1.5 : 0.5;
@@ -775,6 +930,53 @@ export class LevelScene extends Phaser.Scene {
         onComplete: () => this.absorb(mote),
       });
     });
+  }
+
+  /** Spending reach here changes the level permanently: one current goes still. */
+  private wakeEcho(stone: EchoStone): void {
+    stone.awake = true;
+    this.tweens.killTweensOf(stone.core);
+    stone.core.setTint(0xc8fbff).setAlpha(0.95);
+    stone.light.intensity = 2.1;
+    stone.light.radius = 310;
+    this.tweens.add({ targets: stone.current, alpha: 0, duration: 760, ease: "Sine.easeOut" });
+    this.tweens.add({
+      targets: stone.core,
+      scale: { from: stone.core.scale, to: 1.18 },
+      duration: 380,
+      yoyo: true,
+      ease: "Cubic.easeOut",
+    });
+    stone.ring.clear();
+    stone.ring.lineStyle(5, 0xc7fbff, 0.86);
+    stone.ring.strokeCircle(stone.x, stone.y, 62);
+    const wave = this.add.circle(stone.x, stone.y, 60, 0xa5f4ff, 0)
+      .setStrokeStyle(5, 0xa5f4ff, 0.9)
+      .setDepth(12)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: wave,
+      radius: 520,
+      alpha: 0,
+      duration: 900,
+      ease: "Cubic.easeOut",
+      onComplete: () => wave.destroy(),
+    });
+    this.ambience.echoAwake(this.echoesAwake());
+    this.cameras.main.shake(220, 0.0022);
+    if (this.echoHint) {
+      const remaining = this.echoStones.length - this.echoesAwake();
+      this.echoHint.setText(remaining > 0 ? `${remaining} current${remaining === 1 ? "" : "s"} still running` : "the moonwell is still");
+      this.echoHint.setAlpha(0.9);
+      this.tweens.add({ targets: this.echoHint, alpha: 0, duration: 1300, delay: 950, ease: "Sine.easeIn" });
+    }
+    this.grow();
+    this.updateHud();
+    this.reportState();
+  }
+
+  private echoesAwake(): number {
+    return this.echoStones.filter((stone) => stone.awake).length;
   }
 
   /** A spent press answers immediately, but cannot pull or hide its state. */
@@ -954,6 +1156,7 @@ export class LevelScene extends Phaser.Scene {
     }
     this.wisp.x += dx;
     this.wisp.y += dy;
+    this.applyMoonCurrents(dt);
     this.wispLight.setPosition(this.wisp.x, this.wisp.y);
     this.hazardTrail.setPosition(0, 0);
 
@@ -996,6 +1199,27 @@ export class LevelScene extends Phaser.Scene {
           h.y = Math.round(this.hazards[i].img.y);
         }
       }
+    }
+  }
+
+  /**
+   * A dormant moonstone owns one broad vertical current. It pushes both the
+   * light and its intended destination, so it feels like moving water rather
+   * than camera shake. Waking the stone removes the force for the whole run.
+   */
+  private applyMoonCurrents(dt: number): void {
+    this.inCurrent = false;
+    for (const stone of this.echoStones) {
+      if (!stone.awake) stone.current.tilePositionY += stone.pushY * 74 * dt;
+      if (
+        stone.awake
+        || Math.abs(this.wisp.x - stone.x) > CURRENT_HALF_WIDTH
+        || Math.abs(this.wisp.y - stone.y) > CURRENT_HALF_HEIGHT
+      ) continue;
+      this.inCurrent = true;
+      const push = stone.pushY * CURRENT_PUSH_SPEED * dt;
+      this.wisp.y = Phaser.Math.Clamp(this.wisp.y + push, 27, WORLD_HEIGHT - 27);
+      this.target.y = Phaser.Math.Clamp(this.target.y + push, 27, WORLD_HEIGHT - 27);
     }
   }
 
@@ -1167,14 +1391,17 @@ export class LevelScene extends Phaser.Scene {
 
   private grow(): void {
     const required = this.requiredMotes();
-    const progress = Phaser.Math.Clamp(this.collected / required, 0, 1);
+    const moteProgress = this.collected / required;
+    const progress = this.echoStones.length > 0
+      ? Phaser.Math.Clamp(moteProgress * 0.78 + (this.echoesAwake() / this.echoStones.length) * 0.22, 0, 1)
+      : Phaser.Math.Clamp(moteProgress, 0, 1);
     this.beacon.setAlpha(0.05 + progress * 0.8);
     this.beaconLight.intensity = progress * 1.4;
 
     // The beacon opens at the required count - everything past it is the
     // player's own choice: bank the level now, or brave the guarded pockets
     // for the remaining motes and the flawless variant.
-    if (this.collected >= required && !this.levelClear) {
+    if (this.collected >= required && this.echoesAwake() >= this.echoStones.length && !this.levelClear) {
       this.levelClear = true;
       this.ambience.beaconOpen();
       this.showOpenLine();
@@ -1355,7 +1582,10 @@ export class LevelScene extends Phaser.Scene {
       : this.levelClear
         ? `motes ${this.collected}/${this.totalMotes} · beacon open`
         : `motes ${this.collected}/${this.totalMotes} · beacon at ${this.requiredMotes()}`;
-    this.hud.setText(`LEVEL ${this.config.index}/${LEVELS.length}   ${moteSegment}   resets ${this.resets}`);
+    const echoSegment = this.echoStones.length > 0
+      ? `   moonstones ${this.echoesAwake()}/${this.echoStones.length}`
+      : "";
+    this.hud.setText(`LEVEL ${this.config.index}/${LEVELS.length}   ${moteSegment}${echoSegment}   resets ${this.resets}`);
   }
 
   private announceReady(): void {
@@ -1390,6 +1620,9 @@ export class LevelScene extends Phaser.Scene {
       chainRemainingMs: Math.max(0, Math.round(this.chainState.deadline - this.time.now)),
       radianceWaves: this.chainState.waves,
       slowedHazards: this.hazards.filter((h) => h.slowUntil > this.time.now).length,
+      echoesAwake: this.echoesAwake(),
+      echoesRequired: this.echoStones.length,
+      inCurrent: this.inCurrent,
     };
   }
 }

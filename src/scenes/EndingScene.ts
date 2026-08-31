@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { makeGlowTexture, makeSkyTexture } from "../textures";
 import type { Ambience } from "../audio";
 import { VIEW_HEIGHT, VIEW_WIDTH } from "./dimensions";
+import { LEVELS } from "../levels";
 
 interface EndingInitData {
   ambience: Ambience;
@@ -98,7 +99,7 @@ export class EndingScene extends Phaser.Scene {
     // own closing stats the least readable text in the game (found at the
     // 08-24 judging-day playtest).
     const line = this.add
-      .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.78, "the forest remembers the light", {
+      .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.78, "the forest gave way · the moonwell answered", {
         fontFamily: "Georgia, 'Times New Roman', serif",
         fontSize: "24px",
         color: "#e7dcc2",
@@ -112,7 +113,9 @@ export class EndingScene extends Phaser.Scene {
     // scolding, just the resets line it would have gotten anyway.
     if (this.flawless > 0) {
       const flawlessText =
-        this.flawless >= 3 ? "you found every mote there was" : `${this.flawless} of 3 clearings gave up every mote`;
+        this.flawless >= LEVELS.length
+          ? "you found every mote there was"
+          : `${this.flawless} of ${LEVELS.length} places gave up every mote`;
       const flawlessLine = this.add
         .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.845, flawlessText, {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",

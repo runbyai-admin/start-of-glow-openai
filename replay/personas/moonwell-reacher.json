@@ -1,0 +1,11 @@
+{
+  "name": "moonwell-reacher",
+  "description": "A reach-heavy route that keeps testing the verb, used to exercise the Moonwell's spend-to-still switches.",
+  "seed": 20260901,
+  "input": "mouse",
+  "phases": [
+    { "untilSeconds": 1.2, "mode": "wait" },
+    { "untilSeconds": 1.3, "mode": "start" },
+    { "mode": "collect", "safeDist": 160, "fleeDist": 145, "pulseEverySeconds": 0.25 }
+  ]
+}
