@@ -135,16 +135,15 @@ export class EndingScene extends Phaser.Scene {
     // any display that tones the additive glow down), which made the run's
     // own closing stats the least readable text in the game (found at the
     // 08-24 judging-day playtest).
-    const line = this.add
+    this.add
       .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.78, "the forest gave way · the moonwell answered", {
         fontFamily: "Georgia, 'Times New Roman', serif",
         fontSize: "24px",
         color: "#e7dcc2",
       })
       .setOrigin(0.5)
-      .setAlpha(0.48)
+      .setAlpha(1)
       .setDepth(20);
-    this.tweens.add({ targets: line, alpha: 1, duration: 1600, ease: "Sine.easeOut" });
 
     // Only worth a line when it happened - a run that skipped motes gets no
     // scolding, just the resets line it would have gotten anyway.
@@ -153,32 +152,30 @@ export class EndingScene extends Phaser.Scene {
         this.flawless >= LEVELS.length
           ? "you found every mote there was"
           : `${this.flawless} of ${LEVELS.length} places gave up every mote`;
-      const flawlessLine = this.add
+      this.add
         .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.845, flawlessText, {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
           fontSize: "14px",
           color: "#d9c9a3",
         })
         .setOrigin(0.5)
-        .setAlpha(0.35)
+        .setAlpha(0.85)
         .setDepth(20);
-      this.tweens.add({ targets: flawlessLine, alpha: 0.85, duration: 1800, ease: "Sine.easeOut" });
     }
 
     const baseLine =
       this.resets > 0
         ? `the dark caught you ${this.resets} time${this.resets === 1 ? "" : "s"} on the way here`
         : "not once did the dark catch you";
-    const resetsLine = this.add
+    this.add
       .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.885, this.isNewBest ? `${baseLine} - fewest yet` : baseLine, {
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
         fontSize: "14px",
         color: "#cfc0a0",
       })
       .setOrigin(0.5)
-      .setAlpha(0.38)
+      .setAlpha(0.9)
       .setDepth(20);
-    this.tweens.add({ targets: resetsLine, alpha: 0.9, duration: 1900, ease: "Sine.easeOut" });
 
     const prompt = this.add
       .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.94, "press to begin again", {
@@ -187,7 +184,7 @@ export class EndingScene extends Phaser.Scene {
         color: "#a9987a",
       })
       .setOrigin(0.5)
-      .setAlpha(0.35)
+      .setAlpha(0.75)
       .setDepth(20);
     this.tweens.add({
       targets: prompt,
