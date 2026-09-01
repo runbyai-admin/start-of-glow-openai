@@ -26,6 +26,12 @@ export class EndingScene extends Phaser.Scene {
   private isNewBest = false;
   private elapsedMs = 0;
   private leaving = false;
+  private endingStones: Array<{
+    image: Phaser.GameObjects.Image;
+    light: Phaser.GameObjects.Light;
+    startX: number;
+    startY: number;
+  }> = [];
 
   constructor() {
     super("ending");
@@ -38,6 +44,7 @@ export class EndingScene extends Phaser.Scene {
     this.isNewBest = this.recordBest(this.resets);
     this.elapsedMs = 0;
     this.leaving = false;
+    this.endingStones = [];
   }
 
   /**
@@ -88,43 +95,20 @@ export class EndingScene extends Phaser.Scene {
       [VIEW_WIDTH * 0.5, VIEW_HEIGHT * 0.18],
       [VIEW_WIDTH * 0.78, VIEW_HEIGHT * 0.35],
     ];
-    stoneStarts.forEach(([x, y], index) => {
+    stoneStarts.forEach(([x, y]) => {
       const stone = this.add
         .image(x, y, "ending-moonstone")
         .setBlendMode(Phaser.BlendModes.ADD)
         .setScale(0.58)
-        .setAlpha(0)
+        .setAlpha(0.82)
         .setDepth(9);
       const stoneLight = this.lights.addLight(x, y, 180, 0x75e4ef, 0);
-      this.tweens.add({ targets: stone, alpha: 0.92, duration: 360, delay: 280 + index * 260 });
-      this.tweens.add({
-        targets: stone,
-        x: wisp.x,
-        y: wisp.y,
-        scale: 0.18,
-        alpha: 0,
-        duration: 920,
-        delay: 820 + index * 430,
-        ease: "Cubic.easeIn",
-        onUpdate: () => stoneLight.setPosition(stone.x, stone.y).setIntensity(stone.alpha * 1.5),
-        onComplete: () => {
-          stoneLight.intensity = 0;
-          const ring = this.add
-            .circle(wisp.x, wisp.y, 34, 0xa8f5ff, 0)
-            .setStrokeStyle(4, 0xa8f5ff, 0.82)
-            .setDepth(12)
-            .setBlendMode(Phaser.BlendModes.ADD);
-          this.tweens.add({
-            targets: ring,
-            radius: 170 + index * 55,
-            alpha: 0,
-            duration: 720,
-            ease: "Cubic.easeOut",
-            onComplete: () => ring.destroy(),
-          });
-          stone.destroy();
-        },
-      });
+      // Delayed tweens started after a scene transition never became visible
+      // under frame-exact replay: the wisp grew, but the whole promised payoff
+      // stayed an empty sky. Every stone now exists on the first ending frame;
+      // staggered durations preserve the three-beat convergence without a
+      // timer mode that can silently fail.
+      this.endingStones.push({ image: stone, light: stoneLight, startX: x, startY: y });
     });
 
     this.ambience.setStorm(false);
@@ -158,9 +142,9 @@ export class EndingScene extends Phaser.Scene {
         color: "#e7dcc2",
       })
       .setOrigin(0.5)
-      .setAlpha(0)
+      .setAlpha(0.48)
       .setDepth(20);
-    this.tweens.add({ targets: line, alpha: 0.75, duration: 1400, delay: 2400, ease: "Sine.easeOut" });
+    this.tweens.add({ targets: line, alpha: 1, duration: 1600, ease: "Sine.easeOut" });
 
     // Only worth a line when it happened - a run that skipped motes gets no
     // scolding, just the resets line it would have gotten anyway.
@@ -176,9 +160,9 @@ export class EndingScene extends Phaser.Scene {
           color: "#d9c9a3",
         })
         .setOrigin(0.5)
-        .setAlpha(0)
+        .setAlpha(0.35)
         .setDepth(20);
-      this.tweens.add({ targets: flawlessLine, alpha: 0.65, duration: 1400, delay: 2600, ease: "Sine.easeOut" });
+      this.tweens.add({ targets: flawlessLine, alpha: 0.85, duration: 1800, ease: "Sine.easeOut" });
     }
 
     const baseLine =
@@ -192,9 +176,9 @@ export class EndingScene extends Phaser.Scene {
         color: "#cfc0a0",
       })
       .setOrigin(0.5)
-      .setAlpha(0)
+      .setAlpha(0.38)
       .setDepth(20);
-    this.tweens.add({ targets: resetsLine, alpha: 0.6, duration: 1400, delay: 2800, ease: "Sine.easeOut" });
+    this.tweens.add({ targets: resetsLine, alpha: 0.9, duration: 1900, ease: "Sine.easeOut" });
 
     const prompt = this.add
       .text(VIEW_WIDTH / 2, VIEW_HEIGHT * 0.94, "press to begin again", {
@@ -203,13 +187,12 @@ export class EndingScene extends Phaser.Scene {
         color: "#a9987a",
       })
       .setOrigin(0.5)
-      .setAlpha(0)
+      .setAlpha(0.35)
       .setDepth(20);
     this.tweens.add({
       targets: prompt,
-      alpha: { from: 0.25, to: 0.55 },
+      alpha: { from: 0.35, to: 0.75 },
       duration: 1600,
-      delay: 3600,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
@@ -235,6 +218,25 @@ export class EndingScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.elapsedMs += delta;
+    // Scene-transition tweens proved unreliable in deterministic replay even
+    // without a delay: the stones appeared, but never moved. Drive the actual
+    // payoff from the same scene clock as the unskippable input gate. Each
+    // stone crosses on a longer beat, so all three are visible immediately and
+    // then arrive separately in the central dawn.
+    this.endingStones.forEach(({ image, light, startX, startY }, index) => {
+      const duration = 1250 + index * 430;
+      const t = Phaser.Math.Clamp(this.elapsedMs / duration, 0, 1);
+      const eased = t * t * t;
+      image.setPosition(
+        Phaser.Math.Linear(startX, VIEW_WIDTH / 2, eased),
+        Phaser.Math.Linear(startY, VIEW_HEIGHT / 2, eased),
+      );
+      image.setScale(Phaser.Math.Linear(0.58, 0.18, eased));
+      image.setAlpha(0.82 * (1 - eased));
+      light
+        .setPosition(image.x, image.y)
+        .setIntensity(image.alpha * 1.5);
+    });
   }
 
   private restart(): void {
