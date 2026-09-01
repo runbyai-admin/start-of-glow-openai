@@ -24,6 +24,8 @@ export class EndingScene extends Phaser.Scene {
   private resets = 0;
   private flawless = 0;
   private isNewBest = false;
+  private elapsedMs = 0;
+  private leaving = false;
 
   constructor() {
     super("ending");
@@ -34,6 +36,8 @@ export class EndingScene extends Phaser.Scene {
     this.resets = data.resets ?? 0;
     this.flawless = data.flawless ?? 0;
     this.isNewBest = this.recordBest(this.resets);
+    this.elapsedMs = 0;
+    this.leaving = false;
   }
 
   /**
@@ -59,6 +63,7 @@ export class EndingScene extends Phaser.Scene {
   preload(): void {
     makeSkyTexture(this, "sky", VIEW_WIDTH, VIEW_HEIGHT, 11);
     makeGlowTexture(this, "wisp", 85, "rgba(255,255,255,1)", "rgba(150,214,255,0.55)");
+    makeGlowTexture(this, "ending-moonstone", 110, "rgba(205,252,255,1)", "rgba(72,216,235,0.48)");
   }
 
   create(): void {
@@ -73,6 +78,54 @@ export class EndingScene extends Phaser.Scene {
       .setScale(0.5)
       .setDepth(10);
     const light = this.lights.addLight(wisp.x, wisp.y, 300, 0xffe6bf, 1.4);
+
+    // The three world changes from the Moonwell come with the player. Each
+    // awakened stone crosses the dark, rings once, and becomes part of the
+    // final light; the ending is now the payoff for that mechanic, not a
+    // generic bloom after it.
+    const stoneStarts: Array<[number, number]> = [
+      [VIEW_WIDTH * 0.22, VIEW_HEIGHT * 0.35],
+      [VIEW_WIDTH * 0.5, VIEW_HEIGHT * 0.18],
+      [VIEW_WIDTH * 0.78, VIEW_HEIGHT * 0.35],
+    ];
+    stoneStarts.forEach(([x, y], index) => {
+      const stone = this.add
+        .image(x, y, "ending-moonstone")
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setScale(0.58)
+        .setAlpha(0)
+        .setDepth(9);
+      const stoneLight = this.lights.addLight(x, y, 180, 0x75e4ef, 0);
+      this.tweens.add({ targets: stone, alpha: 0.92, duration: 360, delay: 280 + index * 260 });
+      this.tweens.add({
+        targets: stone,
+        x: wisp.x,
+        y: wisp.y,
+        scale: 0.18,
+        alpha: 0,
+        duration: 920,
+        delay: 820 + index * 430,
+        ease: "Cubic.easeIn",
+        onUpdate: () => stoneLight.setPosition(stone.x, stone.y).setIntensity(stone.alpha * 1.5),
+        onComplete: () => {
+          stoneLight.intensity = 0;
+          const ring = this.add
+            .circle(wisp.x, wisp.y, 34, 0xa8f5ff, 0)
+            .setStrokeStyle(4, 0xa8f5ff, 0.82)
+            .setDepth(12)
+            .setBlendMode(Phaser.BlendModes.ADD);
+          this.tweens.add({
+            targets: ring,
+            radius: 170 + index * 55,
+            alpha: 0,
+            duration: 720,
+            ease: "Cubic.easeOut",
+            onComplete: () => ring.destroy(),
+          });
+          stone.destroy();
+        },
+      });
+    });
 
     this.ambience.setStorm(false);
     this.ambience.ending();
@@ -162,15 +215,16 @@ export class EndingScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
 
-    // A target-less tween is this codebase's "wait N ms" - see LevelScene's
-    // `after()` for why this.time.delayedCall is avoided here.
-    this.tweens.add({
-      targets: {},
-      duration: 3600,
-      onComplete: () => {
-        this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.restart());
-        this.input.keyboard!.once("keydown", () => this.restart());
-      },
+    // Gate on the scene clock itself. Deferred listener registration via an
+    // empty-target/counter tween proved unreliable under frame-exact replay:
+    // a player who kept pressing through the beacon could skip the ending in
+    // 0.38–1.38s. Permanent handlers ignore early presses and accept the first
+    // one only after the full convergence has played.
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      if (this.elapsedMs >= 3600) this.restart();
+    });
+    this.input.keyboard!.on("keydown", () => {
+      if (this.elapsedMs >= 3600) this.restart();
     });
 
     this.events.once(Phaser.Scenes.Events.POST_UPDATE, () => {
@@ -179,7 +233,13 @@ export class EndingScene extends Phaser.Scene {
     });
   }
 
+  update(_time: number, delta: number): void {
+    this.elapsedMs += delta;
+  }
+
   private restart(): void {
+    if (this.leaving) return;
+    this.leaving = true;
     this.cameras.main.fadeOut(360, 5, 6, 12);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start("menu");
