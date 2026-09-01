@@ -46,12 +46,16 @@ for (const persona of PERSONAS) {
   if (persona === "moonwell-anchor") {
     const frames = JSON.parse(await fs.readFile(path.join(out, "timeline.json"), "utf8")).frames;
     const hit = frames.findIndex((frame) => frame.level === 4 && frame.resets > 0 && frame.echoesAwake > 0);
-    const returned = hit >= 0 && frames.slice(hit).some(
+    const returnedAt = hit >= 0 ? frames.slice(hit).findIndex(
       (frame) => frame.level === 4
         && frame.anchorX > 220
         && Math.hypot(frame.wispX - frame.anchorX, frame.wispY - frame.anchorY) <= 2,
-    );
-    if (!returned) problems.push("did not return to an awakened Moonwell anchor after the authored hit");
+    ) : -1;
+    if (returnedAt < 0) {
+      problems.push("did not return to an awakened Moonwell anchor after the authored hit");
+    } else if (frames[hit + returnedAt].timeMs - frames[hit].timeMs < 500) {
+      problems.push("Moonwell hit did not hold the death veil for at least 500ms before returning");
+    }
     for (const awake of [1, 2, 3]) {
       const frame = frames.find((candidate) => candidate.level === 4 && candidate.echoesAwake === awake);
       if (!frame || frame.hazardsRemaining !== 3 - awake) {

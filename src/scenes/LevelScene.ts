@@ -189,6 +189,7 @@ export class LevelScene extends Phaser.Scene {
   private flawlessNow = false;
   private locked = false;
   private graceUntil = 0;
+  private waits: Array<{ remainingMs: number; onComplete: () => void }> = [];
   private chainState: ChainState = emptyChain();
 
   constructor() {
@@ -218,6 +219,7 @@ export class LevelScene extends Phaser.Scene {
     this.levelClear = false;
     this.flawlessNow = false;
     this.locked = false;
+    this.waits = [];
     this.chainState = emptyChain();
     this.moteConfigs = [];
     this.motes = [];
@@ -1172,6 +1174,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    this.advanceWaits(delta);
     if (this.locked) return;
 
     const dt = delta / 1000;
@@ -1504,20 +1507,29 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
-  /** The player touched a shadow-wisp: snuff the light, lose this level's progress, try again. */
   /**
-   * A tween with no real target is Phaser's reliable way to run "wait N ms,
-   * then do X" inside a scene - this.time.delayedCall shares the Scene's
-   * Clock with everything else here and, empirically, doesn't fire
-   * reliably under every host this build runs on, where tween onComplete
-   * always does. Every other timed handoff in this scene (fail's reset,
-   * the settle before a hit registers again) goes through this helper
-   * instead, for the same reason.
+   * Scene-owned waits advance from the same deltas as play. Empty-target
+   * tweens can complete immediately under frame-exact replay, while Phaser's
+   * delayedCall has missed callbacks on some hosts. This tiny queue is both
+   * deterministic and continues during the movement lock after a hit.
    */
   private after(ms: number, onComplete: () => void): void {
-    this.tweens.add({ targets: {}, duration: ms, onComplete });
+    this.waits.push({ remainingMs: ms, onComplete });
   }
 
+  private advanceWaits(delta: number): void {
+    const ready: Array<() => void> = [];
+    const pending: typeof this.waits = [];
+    for (const wait of this.waits) {
+      wait.remainingMs -= delta;
+      if (wait.remainingMs <= 0) ready.push(wait.onComplete);
+      else pending.push(wait);
+    }
+    this.waits = pending;
+    for (const onComplete of ready) onComplete();
+  }
+
+  /** The player touched a shadow-wisp: snuff the light, lose this level's progress, try again. */
   private fail(): void {
     this.locked = true;
     this.resets += 1;
@@ -1548,6 +1560,7 @@ export class LevelScene extends Phaser.Scene {
     this.reachRing.clear();
     for (const mote of this.incoming) this.tweens.killTweensOf(mote);
     this.resetChain();
+    this.reportState();
 
     this.after(560, () => {
       this.target.set(this.respawnX, this.respawnY);
