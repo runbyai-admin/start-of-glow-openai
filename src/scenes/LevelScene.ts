@@ -803,22 +803,20 @@ export class LevelScene extends Phaser.Scene {
 
     if (this.config.mood === "moonwell") {
       this.echoHint = this.add
-        .text(VIEW_WIDTH / 2, VIEW_HEIGHT - 54, "spend your reach near each moonstone", {
+        .text(VIEW_WIDTH / 2, VIEW_HEIGHT - 54, "press near each moonstone · spend the reach", {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "17px",
           color: "#bdf8ff",
         })
         .setOrigin(0.5)
-        .setAlpha(0)
+        .setAlpha(0.82)
         .setDepth(100)
         .setScrollFactor(0);
       this.tweens.add({
         targets: this.echoHint,
-        alpha: { from: 0, to: 0.82 },
-        duration: 800,
-        delay: 1000,
-        yoyo: true,
-        hold: 2600,
+        alpha: 0,
+        duration: 700,
+        delay: 3500,
         ease: "Sine.easeInOut",
       });
     }
@@ -977,6 +975,7 @@ export class LevelScene extends Phaser.Scene {
     this.cameras.main.shake(220, 0.0022);
     if (this.echoHint) {
       const remaining = this.echoStones.length - this.echoesAwake();
+      this.tweens.killTweensOf(this.echoHint);
       this.echoHint.setText(
         remaining > 0
           ? `the moonwell remembers · shadow washed away · ${remaining} current${remaining === 1 ? "" : "s"} running`
