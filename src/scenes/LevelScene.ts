@@ -82,6 +82,9 @@ const ECHO_WAKE_RADIUS = 265;
 const CURRENT_HALF_WIDTH = 125;
 const CURRENT_HALF_HEIGHT = 285;
 const CURRENT_PUSH_SPEED = 210;
+/** The rebuilt road is calmer water: close to its line, it carries the wisp onward. */
+const CAUSEWAY_HALF_WIDTH = 38;
+const CAUSEWAY_PUSH_SPEED = 112;
 
 interface EchoStone {
   x: number;
@@ -479,12 +482,11 @@ export class LevelScene extends Phaser.Scene {
     return monument;
   }
 
-  /** The raised ruins join into a persistent lit road across the flooded act. */
+  /** The raised ruins join into a persistent lit road toward the next objective. */
   private redrawMoonCauseway(): void {
     if (!this.moonCauseway) return;
     this.moonCauseway.clear();
     const nodes = [
-      { x: START_X, y: START_Y },
       ...this.echoStones.map((stone) => ({ x: stone.x, y: stone.y })),
       { x: BEACON_X, y: BEACON_Y },
     ];
@@ -505,16 +507,6 @@ export class LevelScene extends Phaser.Scene {
           4,
         );
       }
-    }
-    // The final stone finishes the road into the beacon rather than leaving
-    // the new act's transformation one segment short of its payoff.
-    if (this.echoStones.at(-1)?.awake) {
-      const from = nodes.at(-2)!;
-      const to = nodes.at(-1)!;
-      this.moonCauseway.lineStyle(18, 0x2b9aaa, 0.11);
-      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
-      this.moonCauseway.lineStyle(3, 0xffe4af, 0.75);
-      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
     }
   }
 
@@ -1333,6 +1325,7 @@ export class LevelScene extends Phaser.Scene {
     this.wisp.x += dx;
     this.wisp.y += dy;
     this.applyMoonCurrents(dt);
+    this.applyMoonCauseway(dt);
     this.wispLight.setPosition(this.wisp.x, this.wisp.y);
     this.hazardTrail.setPosition(0, 0);
 
@@ -1396,6 +1389,40 @@ export class LevelScene extends Phaser.Scene {
       const push = stone.pushY * CURRENT_PUSH_SPEED * dt;
       this.wisp.y = Phaser.Math.Clamp(this.wisp.y + push, 27, WORLD_HEIGHT - 27);
       this.target.y = Phaser.Math.Clamp(this.target.y + push, 27, WORLD_HEIGHT - 27);
+    }
+  }
+
+  /**
+   * An awakened moonstone points forward, not back: its luminous segment is a
+   * strip of stilled water that gently carries the wisp toward the next cold
+   * ring (or the beacon). Moving the target with the wisp keeps the ordinary
+   * trailing controls from fighting that earned current.
+   */
+  private applyMoonCauseway(dt: number): void {
+    for (let index = 0; index < this.echoStones.length; index += 1) {
+      const stone = this.echoStones[index];
+      if (!stone.awake) continue;
+      const next = this.echoStones[index + 1] ?? { x: BEACON_X, y: BEACON_Y };
+      const segmentX = next.x - stone.x;
+      const segmentY = next.y - stone.y;
+      const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+      const along = Phaser.Math.Clamp(
+        ((this.wisp.x - stone.x) * segmentX + (this.wisp.y - stone.y) * segmentY) / lengthSquared,
+        0,
+        1,
+      );
+      const nearestX = stone.x + segmentX * along;
+      const nearestY = stone.y + segmentY * along;
+      if (Phaser.Math.Distance.Between(this.wisp.x, this.wisp.y, nearestX, nearestY) > CAUSEWAY_HALF_WIDTH) continue;
+
+      const length = Math.sqrt(lengthSquared);
+      const carryX = (segmentX / length) * CAUSEWAY_PUSH_SPEED * dt;
+      const carryY = (segmentY / length) * CAUSEWAY_PUSH_SPEED * dt;
+      this.wisp.x = Phaser.Math.Clamp(this.wisp.x + carryX, 27, WORLD_WIDTH - 27);
+      this.wisp.y = Phaser.Math.Clamp(this.wisp.y + carryY, 27, WORLD_HEIGHT - 27);
+      this.target.x = Phaser.Math.Clamp(this.target.x + carryX, 27, WORLD_WIDTH - 27);
+      this.target.y = Phaser.Math.Clamp(this.target.y + carryY, 27, WORLD_HEIGHT - 27);
+      break;
     }
   }
 
