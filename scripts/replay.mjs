@@ -480,6 +480,7 @@ export async function runReplay(opts) {
         beaconOpen: state?.beaconOpen ?? false,
         wispX: state?.wispX ?? 0,
         wispY: state?.wispY ?? 0,
+        hazardsRemaining: state?.hazards?.length ?? 0,
         chain: state?.chain ?? 0,
         sounds: 0,
         inputs: actions.length,

@@ -55,6 +55,7 @@ export interface ReplayFrameSample {
   echoesAwake: number;
   anchorX: number;
   anchorY: number;
+  hazardsRemaining: number;
   chain: number;
   /** Audio sources started since the previous frame. */
   sounds: number;
@@ -367,6 +368,7 @@ export function installReplay(game: Phaser.Game, request: ReplayRequest): void {
         echoesAwake: glow?.echoesAwake ?? 0,
         anchorX: glow?.anchorX ?? 0,
         anchorY: glow?.anchorY ?? 0,
+        hazardsRemaining: glow?.hazards.length ?? 0,
         chain: glow?.chain ?? 0,
         sounds: audio.soundsSince(),
         inputs: fed,

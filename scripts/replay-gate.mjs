@@ -52,6 +52,12 @@ for (const persona of PERSONAS) {
         && Math.hypot(frame.wispX - frame.anchorX, frame.wispY - frame.anchorY) <= 2,
     );
     if (!returned) problems.push("did not return to an awakened Moonwell anchor after the authored hit");
+    for (const awake of [1, 2, 3]) {
+      const frame = frames.find((candidate) => candidate.level === 4 && candidate.echoesAwake === awake);
+      if (!frame || frame.hazardsRemaining !== 3 - awake) {
+        problems.push(`moonstone ${awake} did not leave exactly ${3 - awake} shadows`);
+      }
+    }
   }
   if (problems.length) {
     failures += 1;

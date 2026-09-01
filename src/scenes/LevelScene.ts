@@ -945,6 +945,7 @@ export class LevelScene extends Phaser.Scene {
     // that solved current again. Land just beyond the stone, toward the beacon.
     this.respawnX = Phaser.Math.Clamp(stone.x + 105, 27, WORLD_WIDTH - 27);
     this.respawnY = stone.y;
+    this.washAwayNearestShadow(stone);
     this.tweens.killTweensOf(stone.core);
     stone.core.setTint(0xc8fbff).setAlpha(0.95);
     stone.light.intensity = 2.1;
@@ -978,8 +979,8 @@ export class LevelScene extends Phaser.Scene {
       const remaining = this.echoStones.length - this.echoesAwake();
       this.echoHint.setText(
         remaining > 0
-          ? `the moonwell remembers · ${remaining} current${remaining === 1 ? "" : "s"} still running`
-          : "the moonwell remembers · the water is still",
+          ? `the moonwell remembers · shadow washed away · ${remaining} current${remaining === 1 ? "" : "s"} running`
+          : "the water is still · no shadows remain",
       );
       this.echoHint.setAlpha(0.9);
       this.tweens.add({ targets: this.echoHint, alpha: 0, duration: 1300, delay: 950, ease: "Sine.easeIn" });
@@ -987,6 +988,42 @@ export class LevelScene extends Phaser.Scene {
     this.grow();
     this.updateHud();
     this.reportState();
+  }
+
+  /**
+   * Each stone changes the whole local problem, not only its current. The
+   * basin-wide wake ring catches the nearest shadow and dissolves it into the
+   * same pale sparks as the player, leaving one less patrol to cross forever.
+   */
+  private washAwayNearestShadow(stone: EchoStone): void {
+    if (this.hazards.length === 0) return;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    this.hazards.forEach((hazard, index) => {
+      const distance = Phaser.Math.Distance.Between(stone.x, stone.y, hazard.img.x, hazard.img.y);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    const [hazard] = this.hazards.splice(nearestIndex, 1);
+    hazard.tween?.stop();
+    hazard.img.setTint(0x9df3f4);
+    hazard.light.setColor(0x8eeaf2).setIntensity(1.8);
+    this.trail.explode(28, hazard.img.x, hazard.img.y);
+    this.tweens.add({
+      targets: hazard.img,
+      scale: 0.12,
+      alpha: 0,
+      duration: 720,
+      ease: "Cubic.easeOut",
+      onUpdate: () => hazard.light.setPosition(hazard.img.x, hazard.img.y).setIntensity(hazard.img.alpha * 1.8),
+      onComplete: () => {
+        this.lights.removeLight(hazard.light);
+        hazard.img.destroy();
+      },
+    });
   }
 
   private echoesAwake(): number {
