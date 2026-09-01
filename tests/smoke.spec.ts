@@ -83,7 +83,7 @@ test("the authored threshold keeps immediate keyboard and touch start parity", a
 
   for (const start of starts) {
     const context = await browser.newContext({
-      baseURL: "http://127.0.0.1:4183",
+      baseURL: "http://127.0.0.1:4383",
       viewport: { width: 1280, height: 720 },
       hasTouch: Boolean(start.touch),
     });
@@ -104,6 +104,19 @@ test("the authored threshold keeps immediate keyboard and touch start parity", a
     expect(consoleErrors, `${start.name} console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
     await context.close();
   }
+});
+
+test("the round-five shortcut enters the Moonwell without changing the normal start", async ({ page }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await page.goto("/?level=4", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("body[data-game-ready='true']", { timeout: 30_000 });
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => window.__glow?.scene === "level", undefined, { timeout: 15_000 });
+
+  const state = await page.evaluate(() => window.__glow);
+  expect(state?.level).toBe(4);
+  expect(state?.echoesRequired).toBe(3);
+  expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
 });
 
 test("starting the game loads level 1, and the light-being follows input and collects motes", async ({ page }) => {

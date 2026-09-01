@@ -450,7 +450,11 @@ export class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: this.threshold, scale: 1.08, alpha: 1, duration: 520, ease: "Cubic.easeIn" });
     this.cameras.main.fadeOut(560, 5, 6, 12);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start("level", { levelIndex: 1, ambience });
+      // The public round notes point the judge at ?level=4 so the day's new
+      // act can be replayed without walking the unchanged forest first. The
+      // ordinary URL remains the authored four-level journey.
+      const levelIndex = new URLSearchParams(window.location.search).get("level") === "4" ? 4 : 1;
+      this.scene.start("level", { levelIndex, ambience });
     });
   }
 
