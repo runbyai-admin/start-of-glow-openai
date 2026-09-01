@@ -1,11 +1,11 @@
 {
   "name": "cautious",
-  "description": "Waits out the menu, then takes only motes no shadow is near, and backs off when one closes in. The run a careful first-time player has.",
+  "description": "Waits out the menu, takes only safe motes, backs off from shadows, and tries the taught press every three seconds. The run a careful first-time player has.",
   "seed": 20260828,
   "input": "mouse",
   "phases": [
     { "untilSeconds": 1.5, "mode": "wait" },
     { "untilSeconds": 1.6, "mode": "start" },
-    { "mode": "collect", "safeDist": 200, "fleeDist": 180 }
+    { "mode": "collect", "safeDist": 200, "fleeDist": 180, "pulseEverySeconds": 3 }
   ]
 }

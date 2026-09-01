@@ -92,6 +92,8 @@ interface EchoStone {
   ring: Phaser.GameObjects.Graphics;
   light: Phaser.GameObjects.Light;
   current: Phaser.GameObjects.TileSprite;
+  /** A different drowned ruin rises with each solved current. */
+  monument: Phaser.GameObjects.Graphics;
 }
 
 interface LevelInitData {
@@ -145,8 +147,10 @@ export class LevelScene extends Phaser.Scene {
     slowUntil: number;
   }> = [];
   private echoStones: EchoStone[] = [];
+  private moonCauseway?: Phaser.GameObjects.Graphics;
   private inCurrent = false;
   private echoHint?: Phaser.GameObjects.Text;
+  private echoReminderShown = false;
   /** The Moonwell remembers the last stone changed, so a late hit does not replay solved water. */
   private respawnX = START_X;
   private respawnY = START_Y;
@@ -226,8 +230,10 @@ export class LevelScene extends Phaser.Scene {
     this.incoming = [];
     this.hazards = [];
     this.echoStones = [];
+    this.moonCauseway = undefined;
     this.inCurrent = false;
     this.echoHint = undefined;
+    this.echoReminderShown = false;
     this.respawnX = START_X;
     this.respawnY = START_Y;
     this.target.set(START_X, START_Y);
@@ -328,6 +334,14 @@ export class LevelScene extends Phaser.Scene {
     horizon.fillStyle(0x8bd7dd, 0.08);
     horizon.fillEllipse(WORLD_WIDTH * 0.78, WORLD_HEIGHT * 0.28, 430, 90);
 
+    // The open basin owns one landmark the forest never had: a pale moon and
+    // its broken reflection, visible across the entire act. The three drowned
+    // monuments below answer that same vertical shape as the player wakes them.
+    horizon.fillStyle(0xb9f5f1, 0.2);
+    horizon.fillCircle(WORLD_WIDTH * 0.68, 118, 72);
+    horizon.fillStyle(0xe0ffff, 0.08);
+    horizon.fillEllipse(WORLD_WIDTH * 0.68, 360, 54, 410);
+
     const ripples = this.add.graphics().setDepth(-14);
     for (let x = 40; x < WORLD_WIDTH; x += 150) {
       const y = 170 + ((x * 37) % 430);
@@ -354,6 +368,7 @@ export class LevelScene extends Phaser.Scene {
   /** Three permanent world switches and their visible cross-currents. */
   private buildEchoStones(): void {
     if (!this.config.echoStones?.length) return;
+    this.moonCauseway = this.add.graphics().setDepth(-2).setAlpha(0.82);
     const currentKey = "moon-current";
     if (!this.textures.exists(currentKey)) {
       const texture = this.textures.createCanvas(currentKey, 128, 128)!;
@@ -370,7 +385,7 @@ export class LevelScene extends Phaser.Scene {
       texture.refresh();
     }
 
-    for (const cfg of this.config.echoStones) {
+    for (const [index, cfg] of this.config.echoStones.entries()) {
       const current = this.add
         .tileSprite(cfg.x, cfg.y, CURRENT_HALF_WIDTH * 2, CURRENT_HALF_HEIGHT * 2, currentKey)
         .setTint(cfg.pushY > 0 ? 0x75d5e2 : 0x9fe8dd)
@@ -389,7 +404,8 @@ export class LevelScene extends Phaser.Scene {
         .setScale(0.62)
         .setDepth(4);
       const light = this.lights.addLight(cfg.x, cfg.y, 115, 0x6ad9e8, 0.28);
-      this.echoStones.push({ ...cfg, awake: false, core, ring, light, current });
+      const monument = this.buildMoonMonument(index, cfg.x, cfg.y);
+      this.echoStones.push({ ...cfg, awake: false, core, ring, light, current, monument });
       this.tweens.add({
         targets: core,
         alpha: { from: 0.22, to: 0.42 },
@@ -399,6 +415,106 @@ export class LevelScene extends Phaser.Scene {
         repeat: -1,
         ease: "Sine.easeInOut",
       });
+    }
+  }
+
+  /**
+   * Three silhouettes, not three copies: an arch, an obelisk, and twin fins.
+   * They begin mostly below the waterline. Spending reach raises the matching
+   * ruin, so a solved switch remains legible even after its ring leaves camera.
+   */
+  private buildMoonMonument(index: number, x: number, y: number): Phaser.GameObjects.Graphics {
+    const monument = this.add.graphics().setPosition(x, y + 142).setDepth(-1).setAlpha(0.18);
+    monument.fillStyle(0x163e4c, 0.92);
+    monument.lineStyle(6, 0x8ce4e7, 0.72);
+
+    if (index === 0) {
+      monument.fillStyle(0x5cc6d3, 0.42);
+      monument.fillCircle(0, -112, 78);
+      monument.fillStyle(0x071b29, 0.96);
+      monument.fillCircle(0, -112, 57);
+      monument.fillStyle(0x163e4c, 0.92);
+      monument.fillRect(-78, -118, 24, 150);
+      monument.fillRect(54, -118, 24, 150);
+      monument.strokeCircle(0, -112, 67);
+      monument.lineBetween(-78, -112, -54, -112);
+      monument.lineBetween(54, -112, 78, -112);
+    } else if (index === 1) {
+      monument.fillPoints([
+        new Phaser.Geom.Point(-46, 32),
+        new Phaser.Geom.Point(-28, -136),
+        new Phaser.Geom.Point(0, -205),
+        new Phaser.Geom.Point(28, -136),
+        new Phaser.Geom.Point(46, 32),
+      ], true);
+      monument.strokePoints([
+        new Phaser.Geom.Point(-46, 32),
+        new Phaser.Geom.Point(-28, -136),
+        new Phaser.Geom.Point(0, -205),
+        new Phaser.Geom.Point(28, -136),
+        new Phaser.Geom.Point(46, 32),
+      ], true);
+      monument.lineBetween(-20, -92, 20, -92);
+    } else {
+      monument.fillPoints([
+        new Phaser.Geom.Point(-94, 32),
+        new Phaser.Geom.Point(-76, -132),
+        new Phaser.Geom.Point(-28, -54),
+        new Phaser.Geom.Point(-18, 32),
+      ], true);
+      monument.fillPoints([
+        new Phaser.Geom.Point(18, 32),
+        new Phaser.Geom.Point(28, -54),
+        new Phaser.Geom.Point(76, -132),
+        new Phaser.Geom.Point(94, 32),
+      ], true);
+      monument.lineBetween(-94, 32, -76, -132);
+      monument.lineBetween(-76, -132, -28, -54);
+      monument.lineBetween(94, 32, 76, -132);
+      monument.lineBetween(76, -132, 28, -54);
+    }
+
+    monument.fillStyle(0x67cfda, 0.65);
+    monument.fillEllipse(0, 30, index === 1 ? 118 : 210, 18);
+    return monument;
+  }
+
+  /** The raised ruins join into a persistent lit road across the flooded act. */
+  private redrawMoonCauseway(): void {
+    if (!this.moonCauseway) return;
+    this.moonCauseway.clear();
+    const nodes = [
+      { x: START_X, y: START_Y },
+      ...this.echoStones.map((stone) => ({ x: stone.x, y: stone.y })),
+      { x: BEACON_X, y: BEACON_Y },
+    ];
+    for (let index = 0; index < this.echoStones.length; index += 1) {
+      if (!this.echoStones[index].awake) continue;
+      const from = nodes[index];
+      const to = nodes[index + 1];
+      this.moonCauseway.lineStyle(18, 0x2b9aaa, 0.11);
+      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
+      this.moonCauseway.lineStyle(3, 0xbaf9f5, 0.7);
+      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
+      for (let step = 1; step <= 4; step += 1) {
+        const t = step / 5;
+        this.moonCauseway.fillStyle(0xd8ffff, 0.62);
+        this.moonCauseway.fillCircle(
+          Phaser.Math.Linear(from.x, to.x, t),
+          Phaser.Math.Linear(from.y, to.y, t),
+          4,
+        );
+      }
+    }
+    // The final stone finishes the road into the beacon rather than leaving
+    // the new act's transformation one segment short of its payoff.
+    if (this.echoStones.at(-1)?.awake) {
+      const from = nodes.at(-2)!;
+      const to = nodes.at(-1)!;
+      this.moonCauseway.lineStyle(18, 0x2b9aaa, 0.11);
+      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
+      this.moonCauseway.lineStyle(3, 0xffe4af, 0.75);
+      this.moonCauseway.lineBetween(from.x, from.y, to.x, to.y);
     }
   }
 
@@ -952,27 +1068,28 @@ export class LevelScene extends Phaser.Scene {
     stone.light.radius = 310;
     this.tweens.add({ targets: stone.current, alpha: 0, duration: 760, ease: "Sine.easeOut" });
     this.tweens.add({
+      targets: stone.monument,
+      y: stone.y + 12,
+      alpha: 0.9,
+      duration: 980,
+      ease: "Cubic.easeOut",
+    });
+    this.redrawMoonCauseway();
+    this.tweens.add({
       targets: stone.core,
       scale: { from: stone.core.scale, to: 1.18 },
       duration: 380,
       yoyo: true,
       ease: "Cubic.easeOut",
     });
-    stone.ring.clear();
-    stone.ring.lineStyle(5, 0xc7fbff, 0.86);
-    stone.ring.strokeCircle(stone.x, stone.y, 62);
-    const wave = this.add.circle(stone.x, stone.y, 60, 0xa5f4ff, 0)
-      .setStrokeStyle(5, 0xa5f4ff, 0.9)
-      .setDepth(12)
+    // The broad dormant interaction radius has done its teaching. Remove it
+    // completely once solved; leaving that 530px circle beside the player's
+    // reach and alert rings made the transformed basin read as visual noise.
+    stone.ring.setVisible(false);
+    this.add.circle(stone.x, stone.y, 62, 0xc7fbff, 0)
+      .setStrokeStyle(5, 0xc7fbff, 0.86)
+      .setDepth(3)
       .setBlendMode(Phaser.BlendModes.ADD);
-    this.tweens.add({
-      targets: wave,
-      radius: 520,
-      alpha: 0,
-      duration: 900,
-      ease: "Cubic.easeOut",
-      onComplete: () => wave.destroy(),
-    });
     this.ambience.echoAwake(this.echoesAwake());
     this.cameras.main.shake(220, 0.0022);
     if (this.echoHint) {
@@ -985,6 +1102,12 @@ export class LevelScene extends Phaser.Scene {
       );
       this.echoHint.setAlpha(0.9);
       this.tweens.add({ targets: this.echoHint, alpha: 0, duration: 1300, delay: 950, ease: "Sine.easeIn" });
+      // After the satisfying transient, restore the objective if the player
+      // already brought enough loose light but still has another stone to use.
+      this.after(2350, () => {
+        if (!this.echoHint || this.echoesAwake() >= this.echoStones.length || this.collected < this.requiredMotes()) return;
+        this.echoHint.setText("the beacon waits · press inside each pale ring").setAlpha(0.92);
+      });
     }
     this.grow();
     this.updateHud();
@@ -1450,6 +1573,33 @@ export class LevelScene extends Phaser.Scene {
       : Phaser.Math.Clamp(moteProgress, 0, 1);
     this.beacon.setAlpha(0.05 + progress * 0.8);
     this.beaconLight.intensity = progress * 1.4;
+
+    // A movement-only first pass can gather every Moonwell mote without ever
+    // repeating the click that started the game. Once loose light is no longer
+    // the problem, stop fading the lesson: name the blocked objective and make
+    // every unresolved interaction radius breathe. A human gets a clear next
+    // action; the stones are still real required switches, never auto-cleared.
+    if (
+      this.echoStones.length > 0
+      && this.collected >= required
+      && this.echoesAwake() < this.echoStones.length
+      && !this.echoReminderShown
+    ) {
+      this.echoReminderShown = true;
+      this.echoHint?.setText("the beacon waits · press inside each pale ring").setAlpha(0.92);
+      for (const stone of this.echoStones) {
+        if (stone.awake) continue;
+        stone.light.intensity = 0.6;
+        this.tweens.add({
+          targets: stone.ring,
+          alpha: { from: 0.32, to: 1 },
+          duration: 760,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+      }
+    }
 
     // The beacon opens at the required count - everything past it is the
     // player's own choice: bank the level now, or brave the guarded pockets
