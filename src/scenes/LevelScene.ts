@@ -147,6 +147,9 @@ export class LevelScene extends Phaser.Scene {
   private echoStones: EchoStone[] = [];
   private inCurrent = false;
   private echoHint?: Phaser.GameObjects.Text;
+  /** The Moonwell remembers the last stone changed, so a late hit does not replay solved water. */
+  private respawnX = START_X;
+  private respawnY = START_Y;
 
   private hud!: Phaser.GameObjects.Text;
   private levelCard!: Phaser.GameObjects.Text;
@@ -223,6 +226,8 @@ export class LevelScene extends Phaser.Scene {
     this.echoStones = [];
     this.inCurrent = false;
     this.echoHint = undefined;
+    this.respawnX = START_X;
+    this.respawnY = START_Y;
     this.target.set(START_X, START_Y);
   }
 
@@ -935,6 +940,11 @@ export class LevelScene extends Phaser.Scene {
   /** Spending reach here changes the level permanently: one current goes still. */
   private wakeEcho(stone: EchoStone): void {
     stone.awake = true;
+    // The world switch is also a spatial promise: once the player has spent
+    // their light to still this water, a later shadow cannot make them cross
+    // that solved current again. Land just beyond the stone, toward the beacon.
+    this.respawnX = Phaser.Math.Clamp(stone.x + 105, 27, WORLD_WIDTH - 27);
+    this.respawnY = stone.y;
     this.tweens.killTweensOf(stone.core);
     stone.core.setTint(0xc8fbff).setAlpha(0.95);
     stone.light.intensity = 2.1;
@@ -966,7 +976,11 @@ export class LevelScene extends Phaser.Scene {
     this.cameras.main.shake(220, 0.0022);
     if (this.echoHint) {
       const remaining = this.echoStones.length - this.echoesAwake();
-      this.echoHint.setText(remaining > 0 ? `${remaining} current${remaining === 1 ? "" : "s"} still running` : "the moonwell is still");
+      this.echoHint.setText(
+        remaining > 0
+          ? `the moonwell remembers · ${remaining} current${remaining === 1 ? "" : "s"} still running`
+          : "the moonwell remembers · the water is still",
+      );
       this.echoHint.setAlpha(0.9);
       this.tweens.add({ targets: this.echoHint, alpha: 0, duration: 1300, delay: 950, ease: "Sine.easeIn" });
     }
@@ -1500,9 +1514,9 @@ export class LevelScene extends Phaser.Scene {
     this.resetChain();
 
     this.after(560, () => {
-      this.target.set(START_X, START_Y);
-      this.wisp.setPosition(START_X, START_Y);
-      this.wispLight.setPosition(START_X, START_Y);
+      this.target.set(this.respawnX, this.respawnY);
+      this.wisp.setPosition(this.respawnX, this.respawnY);
+      this.wispLight.setPosition(this.respawnX, this.respawnY);
       // What a shadow takes is your light, not your work. The old fail wiped
       // the level's motes and started it again, which at twenty seconds in is
       // the moment a player stops playing - and it punished the one thing the
@@ -1623,6 +1637,8 @@ export class LevelScene extends Phaser.Scene {
       echoesAwake: this.echoesAwake(),
       echoesRequired: this.echoStones.length,
       inCurrent: this.inCurrent,
+      anchorX: Math.round(this.respawnX),
+      anchorY: Math.round(this.respawnY),
     };
   }
 }

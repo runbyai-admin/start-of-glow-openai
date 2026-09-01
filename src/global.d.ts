@@ -40,6 +40,9 @@ interface GlowTestState {
   /** Moonwell world state: currents disappear as their stones wake. */
   echoesAwake?: number;
   echoesRequired?: number;
+  /** Last awakened Moonwell stone, used as the safe return point after a hit. */
+  anchorX?: number;
+  anchorY?: number;
   inCurrent?: boolean;
 }
 

@@ -51,6 +51,10 @@ export interface ReplayFrameSample {
   beaconOpen: boolean;
   wispX: number;
   wispY: number;
+  /** Moonwell progression, including the spatial checkpoint earned by its last world switch. */
+  echoesAwake: number;
+  anchorX: number;
+  anchorY: number;
   chain: number;
   /** Audio sources started since the previous frame. */
   sounds: number;
@@ -360,6 +364,9 @@ export function installReplay(game: Phaser.Game, request: ReplayRequest): void {
         beaconOpen: glow?.beaconOpen ?? false,
         wispX: glow?.wispX ?? 0,
         wispY: glow?.wispY ?? 0,
+        echoesAwake: glow?.echoesAwake ?? 0,
+        anchorX: glow?.anchorX ?? 0,
+        anchorY: glow?.anchorY ?? 0,
         chain: glow?.chain ?? 0,
         sounds: audio.soundsSince(),
         inputs: fed,

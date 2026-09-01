@@ -1,0 +1,13 @@
+{
+  "name": "moonwell-anchor",
+  "description": "Plays through two Moonwell switches, deliberately meets a shadow, then verifies the awakened stone is the return point.",
+  "seed": 20260901,
+  "input": "mouse",
+  "phases": [
+    { "untilSeconds": 1.2, "mode": "wait" },
+    { "untilSeconds": 1.3, "mode": "start" },
+    { "untilEchoesAwake": 2, "mode": "collect", "safeDist": 160, "fleeDist": 145, "pulseEverySeconds": 0.25 },
+    { "untilResets": 1, "mode": "hazard" },
+    { "mode": "collect", "safeDist": 160, "fleeDist": 145, "pulseEverySeconds": 0.25 }
+  ]
+}

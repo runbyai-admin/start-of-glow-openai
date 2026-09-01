@@ -134,9 +134,21 @@ function scriptedActions(persona, frame) {
   return persona.actions?.[String(frame)] ?? [];
 }
 
-function phaseFor(persona, seconds) {
+function phaseFor(persona, seconds, state) {
   for (const phase of persona.phases) {
-    if (phase.untilSeconds === undefined || seconds < phase.untilSeconds) return phase;
+    if (phase.untilSeconds !== undefined) {
+      if (seconds < phase.untilSeconds) return phase;
+      continue;
+    }
+    if (phase.untilEchoesAwake !== undefined) {
+      if ((state?.echoesAwake ?? 0) < phase.untilEchoesAwake) return phase;
+      continue;
+    }
+    if (phase.untilResets !== undefined) {
+      if ((state?.resets ?? 0) < phase.untilResets) return phase;
+      continue;
+    }
+    return phase;
   }
   return persona.phases[persona.phases.length - 1];
 }
@@ -150,6 +162,9 @@ function steerTarget(state, phase) {
   const nearest = hazards
     .map((h) => ({ h, d: Math.hypot(h.x - state.wispX, h.y - state.wispY) }))
     .sort((a, b) => a.d - b.d)[0];
+  // A targeted failure phase is useful for checkpoint regressions: play the
+  // authored route first, then deliberately let the nearest shadow catch up.
+  if (phase.mode === "hazard") return nearest?.h ?? null;
   if (fleeDist > 0 && nearest && nearest.d < fleeDist) {
     // Back away along the line from the shadow, the way a careful player does.
     return { x: state.wispX + (state.wispX - nearest.h.x) * 3, y: state.wispY + (state.wispY - nearest.h.y) * 3 };
@@ -438,7 +453,7 @@ export async function runReplay(opts) {
   for (let frame = 0; frame < totalFrames; frame += 1) {
     const actions = scripted
       ? scriptedActions(persona, frame)
-      : actionsFor(persona, phaseFor(persona, frame / 60), state, scrollX, frame, held);
+      : actionsFor(persona, phaseFor(persona, frame / 60, state), state, scrollX, frame, held);
 
     let sample;
     if (deterministic) {
